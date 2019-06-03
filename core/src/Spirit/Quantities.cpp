@@ -1,7 +1,6 @@
 #include <Spirit/Quantities.h>
 #include <Spirit/Geometry.h>
 #include <data/State.hpp>
-#include <engine/HTST.hpp>
 #include <engine/Vectormath.hpp>
 #include <engine/Manifoldmath.hpp>
 #include <engine/Eigenmodes.hpp>
@@ -67,29 +66,6 @@ float Quantity_Get_Topological_Charge(State * state, int idx_image, int idx_chai
         spirit_handle_exception_api(idx_image, idx_chain);
         return 0;
     }
-}
-
-
-float Quantity_Get_HTST_Prefactor(State * state, int idx_image_minimum, int idx_image_sp, int idx_chain)
-try
-{
-    std::shared_ptr<Data::Spin_System> image_minimum, image_sp;
-    std::shared_ptr<Data::Spin_System_Chain> chain;
-    from_indices(state, idx_image_minimum, idx_chain, image_minimum, chain);
-    from_indices(state, idx_image_sp, idx_chain, image_sp, chain);
-
-    auto& info = chain->htst_info;
-    info.minimum = image_minimum;
-    info.saddle_point = image_sp;
-
-    Engine::HTST::Calculate_Prefactor(chain->htst_info);
-
-    return (float)info.prefactor;
-}
-catch( ... )
-{
-    spirit_handle_exception_api(-1, idx_chain);
-    return 0;
 }
 
 
