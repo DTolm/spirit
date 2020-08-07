@@ -5,22 +5,49 @@
 
 #include "Spirit_Defines.h"
 
+/*
+Constants
+====================================================================
+
+```C
+#include "Spirit/Constants.h"
+```
+
+Physical constants in units compatible to what is used in Spirit.
+*/
+
 // The Bohr Magneton [meV / T]
-DLLEXPORT scalar Constants_mu_B() noexcept;
+PREFIX scalar Constants_mu_B() SUFFIX;
+
 // The vacuum permeability [T^2 m^3 / meV]
-DLLEXPORT scalar Constants_mu_0() noexcept;
+PREFIX scalar Constants_mu_0() SUFFIX;
+
 // The Boltzmann constant [meV / K]
-DLLEXPORT scalar Constants_k_B() noexcept;
+PREFIX scalar Constants_k_B() SUFFIX;
+
 // Planck constant [meV*ps / rad]
-DLLEXPORT scalar Constants_hbar() noexcept;
+PREFIX scalar Constants_hbar() SUFFIX;
+
 // Millirydberg [mRy / meV]
-DLLEXPORT scalar Constants_mRy() noexcept;
+PREFIX scalar Constants_mRy() SUFFIX;
+
 // Gyromagnetic ratio of electron [rad / (s*T)]
-DLLEXPORT scalar Constants_gamma() noexcept;
+PREFIX scalar Constants_gamma() SUFFIX;
+
 // Electron g-factor [unitless]
-DLLEXPORT scalar Constants_g_e() noexcept;
+PREFIX scalar Constants_g_e() SUFFIX;
+
+// Erg [erg / meV]
+PREFIX scalar Constants_erg() SUFFIX;
+
+// Joule [J / meV]
+PREFIX scalar Constants_Joule() SUFFIX;
+
 // Pi [rad]
-DLLEXPORT scalar Constants_Pi() noexcept;
+PREFIX scalar Constants_Pi() SUFFIX;
+
+// Pi/2 [rad]
+PREFIX scalar Constants_Pi_2() SUFFIX;
 
 #include "DLL_Undefine_Export.h"
 #endif

@@ -1,0 +1,38 @@
+#version 450
+
+layout (local_size_x = 1024, local_size_y = 1,local_size_z = 1) in;
+layout(binding = 0) buffer Data
+{
+   float s [];
+};
+layout(binding = 1) readonly buffer Data2
+{
+   float sd [];
+};
+layout (constant_id = 1) const uint pad = 0;
+void main() {
+      float theta = sqrt(sd[gl_GlobalInvocationID.x]*sd[gl_GlobalInvocationID.x]+sd[gl_GlobalInvocationID.x+pad]*sd[gl_GlobalInvocationID.x+pad]+sd[gl_GlobalInvocationID.x+2*pad]*sd[gl_GlobalInvocationID.x+2*pad]);
+      float theta_inv = 1.0/theta;
+      float q = cos(theta);
+      float w = 1 - q;
+      float x = -sd[gl_GlobalInvocationID.x]* theta_inv;
+      float y = -sd[gl_GlobalInvocationID.x+pad]* theta_inv;
+      float z = -sd[gl_GlobalInvocationID.x+2*pad]* theta_inv;
+      float s1 = -y * z * w;
+      float s2 = x * z * w;
+      float s3 = -x * y * w;
+      float p1 = x * sin(theta);
+      float p2 = y * sin(theta);
+      float p3 = z * sin(theta);
+      float t1, t2, t3;
+      if (theta > 1.0e-20) // if theta is too small we do nothing
+      {
+        t1 = (q + z * z * w) * s[gl_GlobalInvocationID.x] + (s1 + p1) * s[gl_GlobalInvocationID.x+pad] + (s2 + p2) * s[gl_GlobalInvocationID.x+2*pad];
+        t2 = (s1 - p1) * s[gl_GlobalInvocationID.x] + (q + y * y * w) * s[gl_GlobalInvocationID.x+pad] + (s3 + p3) * s[gl_GlobalInvocationID.x+2*pad];
+        t3 = (s2 - p2) * s[gl_GlobalInvocationID.x] + (s3 - p3) * s[gl_GlobalInvocationID.x+pad] + (q + x * x * w) * s[gl_GlobalInvocationID.x+2*pad];
+        s[gl_GlobalInvocationID.x] = t1;
+        s[gl_GlobalInvocationID.x+pad] = t2;
+        s[gl_GlobalInvocationID.x+2*pad] = t3;
+      };
+
+}

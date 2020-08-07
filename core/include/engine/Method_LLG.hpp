@@ -25,8 +25,10 @@ namespace Engine
 
         // Method name as string
         std::string Name() override;
-
+        scalar picoseconds_passed=0.0;
     private:
+        // Prepare random numbers for thermal fields, if needed
+        void Prepare_Thermal_Field() override;
         // Calculate Forces onto Systems
         void Calculate_Force(const std::vector<std::shared_ptr<vectorfield>> & configurations, std::vector<vectorfield> & forces) override;
         void Calculate_Force_Virtual(const std::vector<std::shared_ptr<vectorfield>> & configurations, const std::vector<vectorfield> & forces, std::vector<vectorfield> & forces_virtual) override;
@@ -54,7 +56,7 @@ namespace Engine
         vectorfield s_c_grad;
 
         // Measure of simulated time in picoseconds
-        scalar picoseconds_passed;
+        //scalar picoseconds_passed;
     };
 }
 

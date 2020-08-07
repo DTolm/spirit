@@ -1,0 +1,21 @@
+#version 450
+
+layout (local_size_x = 1024, local_size_y = 1,local_size_z = 1) in;
+layout(binding = 0) writeonly buffer Data
+{
+   float q_vec [];
+};
+layout(binding = 1) readonly buffer Data2
+{
+   float delta_grad [];
+};
+
+layout(push_constant) uniform PushConsts
+{
+  uint offset1;
+  float alpha;
+} consts;
+
+void main() {
+      q_vec[gl_GlobalInvocationID.x]-=consts.alpha*delta_grad[consts.offset1+gl_GlobalInvocationID.x];
+}

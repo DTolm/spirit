@@ -1,0 +1,110 @@
+#version 450
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+
+layout (local_size_x_id = 1) in;
+layout (constant_id = 2) const int sumSubGroupSize = 64;
+
+layout(binding = 0) buffer Data
+{
+   float s [];
+};
+layout(binding = 1) buffer Data0
+{
+   float s_copy [];
+};
+layout(binding = 2) buffer Data1
+{
+   float sd [];
+};
+layout(binding = 3) buffer Data2
+{
+   float torque0 [];
+};
+layout(binding = 4) buffer Data3
+{
+   float torque1 [];
+};
+layout(binding = 5) buffer Data4
+{
+   float energy [];
+};
+
+
+layout(push_constant) uniform PushConsts
+{
+  uint num_mem;
+  uint nos;
+  uint pad;
+  float eps;
+  uint k;
+  float max_move;
+} consts;
+shared float sdata[sumSubGroupSize];
+
+void main() {
+
+	uint id_x=gl_GlobalInvocationID.x;
+
+	//float s_norm=1.0;
+	
+	float theta1 = sqrt(sd[id_x]*sd[id_x]+sd[id_x+consts.pad]*sd[id_x+consts.pad]+sd[id_x+2*consts.pad]*sd[id_x+2*consts.pad]);
+	float theta1_inv = 1.0/theta1;
+	
+	float f_der0=(torque0[id_x]*sd[id_x]+torque0[id_x+consts.pad]*sd[id_x+consts.pad]+torque0[id_x+2*consts.pad]*sd[id_x+2*consts.pad]);
+	float f_der1=(torque1[id_x]*sd[id_x]+torque1[id_x+consts.pad]*sd[id_x+consts.pad]+torque1[id_x+2*consts.pad]*sd[id_x+2*consts.pad]);
+	float c1 = (-2*(energy[gl_GlobalInvocationID.x]-energy[consts.nos+gl_GlobalInvocationID.x])*theta1_inv+f_der1+f_der0)*theta1_inv*theta1_inv;
+	float c2 = (3*(energy[gl_GlobalInvocationID.x]-energy[consts.nos+gl_GlobalInvocationID.x])*theta1_inv-f_der1-2*f_der0)*theta1_inv;
+	float c3 = f_der0;
+	float c4 = energy[consts.nos+gl_GlobalInvocationID.x];
+	float det=c2*c2-3*c1*c3;
+	float alpha =0;
+	if (det >0)
+		alpha = (-c2+sqrt(det))/(3*c1);
+	if ((alpha<=0) || (alpha >= theta1)){
+		if (energy[gl_GlobalInvocationID.x]>energy[consts.nos+gl_GlobalInvocationID.x])
+			alpha=0;
+		else
+			alpha=theta1;
+			
+	}
+	/*if (energy[gl_GlobalInvocationID.x]>energy[consts.nos+gl_GlobalInvocationID.x])
+		alpha=0;
+	else
+		alpha=theta1;*/
+	sd[id_x]*=alpha*theta1_inv;
+	sd[id_x+consts.pad]*=alpha*theta1_inv;
+	sd[id_x+2*consts.pad]*=alpha*theta1_inv;
+	
+	if (alpha<=0){
+		s[id_x]=s_copy[id_x]; 
+		s[id_x+consts.pad]=	s_copy[id_x+consts.pad]; 
+		s[id_x+2*consts.pad]= s_copy[id_x+2*consts.pad]; 
+	} else{
+		if ((alpha<theta1)&&(alpha > 1.0e-20)){
+			float theta = alpha;
+			float theta_inv = 1.0/theta;
+			float q = cos(theta);
+			float w = 1 - q;
+			float x = -sd[id_x]* theta_inv;
+			float y = -sd[id_x+consts.pad]* theta_inv;
+			float z = -sd[id_x+2*consts.pad]* theta_inv;
+			float s1 = x * y * w;
+			float s2 = x * z * w;
+			float s3 = z * y * w;
+			float p1 = z * sin(theta);
+			float p2 = y * sin(theta);
+			float p3 = x * sin(theta);
+			float t1, t2, t3;
+		
+			t1 = (q + x* x * w) * s[id_x] + (s1 - p1) * s[id_x+consts.pad] + (s2 + p2) * s[id_x+2*consts.pad];
+			t2 = (s1 + p1) * s[id_x] + (q + y * y * w) * s[id_x+consts.pad] + (s3 - p3) * s[id_x+2*consts.pad];
+			t3 = (s2 - p2) * s[id_x] + (s3 + p3) * s[id_x+consts.pad] + (q + z * z * w) * s[id_x+2*consts.pad];
+			
+			s[id_x] = t1;
+			s[id_x+consts.pad] = t2;
+			s[id_x+2*consts.pad] = t3;
+		};
+	}
+	
+
+}

@@ -19,7 +19,7 @@ class IsosurfaceWidget : public QWidget, private Ui::IsosurfaceWidget
     Q_OBJECT
 
 public:
-	IsosurfaceWidget(std::shared_ptr<State> state, SpinWidget *spinWidget);
+	IsosurfaceWidget(std::shared_ptr<State> state, SpinWidget *spinWidget, int i=0);
 
 	std::shared_ptr<State> state;
 	SpinWidget * spinWidget;

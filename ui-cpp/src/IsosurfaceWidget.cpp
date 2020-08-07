@@ -3,7 +3,7 @@
 #include "IsosurfaceWidget.hpp"
 #include "SpinWidget.hpp"
 
-IsosurfaceWidget::IsosurfaceWidget(std::shared_ptr<State> state, SpinWidget *spinWidget)
+IsosurfaceWidget::IsosurfaceWidget(std::shared_ptr<State> state, SpinWidget *spinWidget, int i)
 {
     this->state = state;
     this->spinWidget = spinWidget;
@@ -19,7 +19,16 @@ IsosurfaceWidget::IsosurfaceWidget(std::shared_ptr<State> state, SpinWidget *spi
     this->setIsovalue(0);
     this->setIsocomponent(2);
     this->setDrawShadows(false);
-
+    if (i == 1) {
+        this->setIsovalue(0.96);
+        this->setIsocomponent(0);
+        this->setDrawShadows(false);
+    }
+    if (i == 2) {
+        this->setIsovalue(-0.96);
+        this->setIsocomponent(0);
+        this->setDrawShadows(false);
+    }
     // Read values
     auto isovalue = this->isovalue();
     horizontalSlider_isovalue->setRange(0, 100);

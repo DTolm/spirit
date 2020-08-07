@@ -17,7 +17,7 @@ namespace Engine
 
     void Hamiltonian_Gaussian::Update_Energy_Contributions()
     {
-        this->energy_contributions_per_spin = { { "Gaussian", scalarfield(0) } };
+        /*this->energy_contributions_per_spin = { { "Gaussian", scalarfield(0) } };*/
     }
 
     void Hamiltonian_Gaussian::Hessian(const vectorfield & spins, MatrixX & hessian)
@@ -28,30 +28,29 @@ namespace Engine
             // Set Hessian to zero
             hessian.setZero();
             // Calculate Hessian
-            for (int i = 0; i < this->n_gaussians; ++i)
+            for (int igauss = 0; igauss < this->n_gaussians; ++igauss)
             {
                 // Distance between spin and gaussian center
-                scalar l = 1 - this->center[i].dot(spins[ispin]); //Utility::Manifoldmath::Dist_Greatcircle(this->center[i], n);
-                // Scalar product of spin and gaussian center
-                //scalar nc = 0;
-                //for (int dim = 0; dim < 3; ++dim) nc += spins[ispin + dim*nos] * this->center[i][dim];
+                scalar l = 1 - this->center[igauss].dot(spins[ispin]);
                 // Prefactor for all alpha, beta
-                scalar prefactor = this->amplitude[i] * std::exp(-std::pow(l, 2) / (2.0*std::pow(this->width[i], 2)))
-                    / std::pow(this->width[i], 2)
-                    * (std::pow(l, 2) / std::pow(this->width[i], 2) - 1);
+                scalar prefactor = this->amplitude[igauss] * std::exp(-std::pow(l, 2) / (2.0*std::pow(this->width[igauss], 2)))
+                    / std::pow(this->width[igauss], 2)
+                    * (std::pow(l, 2) / std::pow(this->width[igauss], 2) - 1);
                 // Effective Field contribution
                 for (int alpha = 0; alpha < 3; ++alpha)
                 {
                     for (int beta = 0; beta < 3; ++beta)
                     {
-                        hessian(ispin+alpha*nos, ispin + beta*nos) += prefactor * this->center[i][alpha] * this->center[i][beta];
+                        int i = 3 * ispin + alpha;
+                        int j = 3 * ispin + beta;
+                        hessian(i,j) += prefactor * this->center[igauss][alpha] * this->center[igauss][beta];
                     }
                 }
             }
         }
     }
 
-    void Hamiltonian_Gaussian::Gradient(const vectorfield & spins, vectorfield & gradient)
+    void Hamiltonian_Gaussian::Gradient(const vectorfield & spins, vectorfield & gradient, VulkanCompute::ComputeApplication* app)
     {
         int nos = spins.size();
 
@@ -77,7 +76,7 @@ namespace Engine
 
     void Hamiltonian_Gaussian::Energy_Contributions_per_Spin(const vectorfield & spins, std::vector<std::pair<std::string, scalarfield>> & contributions)
     {
-        int nos = spins.size();
+        /*int nos = spins.size();
 
         // Allocate if not already allocated
         if (this->energy_contributions_per_spin[0].second.size() != nos) this->energy_contributions_per_spin = { { "Gaussian", scalarfield(nos,0) } };
@@ -91,15 +90,15 @@ namespace Engine
             {
                 // Distance between spin and gaussian center
                 scalar l = 1 - this->center[i].dot(spins[ispin]); //Utility::Manifoldmath::Dist_Greatcircle(this->center[i], n);
-                                                                    // Energy contribution
+                // Energy contribution
                 this->energy_contributions_per_spin[0].second[ispin] += this->amplitude[i] * std::exp(-std::pow(l, 2) / (2.0*std::pow(this->width[i], 2)));
             }
-        }
+        }*/
     }
 
     scalar Hamiltonian_Gaussian::Energy_Single_Spin(int ispin, const vectorfield & spins)
     {
-        scalar Energy = 0;
+        /*scalar Energy = 0;
         for (int i = 0; i < this->n_gaussians; ++i)
         {
             // Distance between spin and gaussian center
@@ -107,7 +106,8 @@ namespace Engine
             // Energy contribution
             this->energy_contributions_per_spin[0].second[ispin] += this->amplitude[i] * std::exp(-std::pow(l, 2) / (2.0*std::pow(this->width[i], 2)));
         }
-        return Energy;
+        return Energy;*/
+	return 0;
     }
 
     // Hamiltonian name as string

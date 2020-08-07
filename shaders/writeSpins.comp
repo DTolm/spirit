@@ -1,0 +1,31 @@
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+
+#define WORKGROUP_SIZE 32
+layout (local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = 1 ) in;
+
+layout(binding = 0) uniform UBO {
+    uint WIDTH;
+    uint HEIGHT;
+    uint DEPTH;
+    uint n;
+};
+
+layout(binding = 1) readonly buffer DataIn
+{
+   float datain [];
+};
+
+layout(binding = 2) writeonly buffer DataOut
+{
+   float dataout [];
+};
+void main() {
+	
+	uint id_in=(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * WIDTH + gl_GlobalInvocationID.z * WIDTH * HEIGHT );
+	uint id_out=3*(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * WIDTH + gl_GlobalInvocationID.z * WIDTH * HEIGHT );
+	dataout[id_out]=datain[id_in];
+	dataout[id_out+1]=datain[id_in+n];
+	dataout[id_out+2]=datain[id_in+2*n];
+
+}

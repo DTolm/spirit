@@ -1,0 +1,59 @@
+#version 450
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+
+layout (local_size_x_id = 1) in;
+layout (constant_id = 2) const int sumSubGroupSize = 64;
+
+layout(binding = 0) buffer Data0
+{
+   float s [];
+};
+layout(binding = 1) buffer Data1
+{
+   float s_copy [];
+};
+layout(binding = 2) buffer Data2
+{
+   float torque [];
+};
+layout(binding = 3) buffer Data3
+{
+   float s_k1 [];
+};
+layout(binding = 4) buffer Torque
+{
+   float gamma_dt_from_torque [];
+};
+layout(push_constant) uniform PushConsts
+{
+  
+  float dt;
+  uint pad;
+} consts;
+shared float sdata[sumSubGroupSize];
+
+void main() {
+
+	uint id_x=gl_GlobalInvocationID.x;
+	
+	float gamma_dt= (consts.dt==0) ? 1e-4/gamma_dt_from_torque[0] : consts.dt; 
+	s_copy[id_x]=s[id_x];
+	s_copy[id_x+consts.pad]=s[id_x+consts.pad];
+	s_copy[id_x+2*consts.pad]=s[id_x+2*consts.pad];
+	s_k1[id_x]=-gamma_dt*torque[id_x];
+	s_k1[id_x+consts.pad]=-gamma_dt*torque[id_x+consts.pad];
+	s_k1[id_x+2*consts.pad]=-gamma_dt*torque[id_x+2*consts.pad];
+	float s_out_x=s_copy[id_x]+0.5*s_k1[id_x];
+	float s_out_y=s_copy[id_x+consts.pad]+0.5*s_k1[id_x+consts.pad];
+	float s_out_z=s_copy[id_x+2*consts.pad]+0.5*s_k1[id_x+2*consts.pad];
+	float s_norm = sqrt(s_out_x*s_out_x+s_out_y*s_out_y+s_out_z*s_out_z);
+	if (s_norm>0){
+		s[id_x] =  s_out_x/s_norm;
+		s[id_x+consts.pad] = s_out_y/s_norm;
+		s[id_x+2*consts.pad] = s_out_z/s_norm;
+	} else{
+		s[id_x] =  0;
+		s[id_x+consts.pad] = 0;
+		s[id_x+2*consts.pad] = 0;
+	}
+}

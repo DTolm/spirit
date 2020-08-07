@@ -1,0 +1,137 @@
+#version 450
+#extension GL_ARB_gpu_shader_fp64 : enable
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+
+double sina_11(double x)
+{
+    //minimax coefs for sin for 0..pi/2 range
+    const double a3 = -1.666666660646699151540776973346659104119e-1LF;
+    const double a5 =  8.333330495671426021718370503012583606364e-3LF;
+    const double a7 = -1.984080403919620610590106573736892971297e-4LF;
+    const double a9 =  2.752261885409148183683678902130857814965e-6LF;
+    const double ab = -2.384669400943475552559273983214582409441e-8LF;
+
+    const double m_2_pi = 0.636619772367581343076LF;
+    const double m_pi_2 = 1.57079632679489661923LF;
+
+    double y = abs(x * m_2_pi);
+    double q = floor(y);
+    int quadrant = int(q);
+
+    double t = (quadrant & 1) != 0 ? 1 - y + q : y - q;
+    t *= m_pi_2;
+
+    double t2 = t * t;
+    double r = fma(fma(fma(fma(fma(ab, t2, a9), t2, a7), t2, a5), t2, a3),
+        t2*t, t);
+
+    r = x < 0 ? -r : r;
+
+    return (quadrant & 2) != 0 ? -r : r;
+}
+double cosa_11(double x)
+{
+    //sin(x + PI/2) = cos(x)
+    return sina_11(x + 1.57079632679489661923LF);
+}
+layout (local_size_x = 1024, local_size_y = 1,local_size_z = 1) in;
+layout (constant_id = 1) const int sumSubGroupSize = 64;
+layout(binding = 0) readonly buffer Data0
+{
+   float grad [];
+};
+layout(binding = 1) writeonly buffer Data2
+{
+   float grad_pr [];
+};
+layout(binding = 2) buffer Data3
+{
+   float s [];
+};
+
+layout(binding = 3) readonly buffer Data4
+{
+   float reduceResults[];
+};
+
+layout(std430, binding = 4) writeonly buffer PartialMax
+{
+   float partial_max[];
+};
+
+layout(push_constant) uniform PushConsts
+{
+  float dt;
+  float grad_add;
+  uint pad;
+} consts;
+
+shared float sdata[sumSubGroupSize];
+
+void main() {
+	uint id_x=gl_GlobalInvocationID.x;
+	grad_pr[id_x]=grad[id_x];
+	grad_pr[id_x+consts.pad]=grad[id_x+consts.pad];
+	grad_pr[id_x+2*consts.pad]=grad[id_x+2*consts.pad];
+	double grad_mult=0;
+	if (reduceResults[0] <= 0) {
+		grad_mult = consts.grad_add;//-consts.dt * 0.5 * consts.m_temp_inv;
+	}
+	else {
+		grad_mult = consts.grad_add-consts.dt * reduceResults[0]/reduceResults[1];
+	}
+	//float temp_x=0;
+	//float temp_y=0;
+	//float temp_z=0;
+	double theta = sqrt(grad_mult*grad[id_x]*grad_mult*grad[id_x]+grad_mult*grad[id_x+consts.pad]*grad_mult*grad[id_x+consts.pad]+grad_mult*grad[id_x+2*consts.pad]*grad_mult*grad[id_x+2*consts.pad]);
+	if (theta > 1.0e-20) // if theta is too small we do nothing
+	{
+		double theta_inv = 1.0/theta;
+		double q = cosa_11(theta);
+		double w = 1 - q;
+		double x = -grad_mult*grad[id_x]* theta_inv;
+		double y = -grad_mult*grad[id_x+consts.pad]* theta_inv;
+		double z = -grad_mult*grad[id_x+2*consts.pad]* theta_inv;
+		  
+		double s1 = -y * z * w;
+		double s2 = x * z * w;
+		double s3 = -x * y * w;
+		double sin_theta = sina_11(theta);
+		double p1 = x * sin_theta;
+		double p2 = y * sin_theta;
+		double p3 = z * sin_theta;
+		double t1, t2, t3;
+	
+		t1 = (q + z * z * w) * s[id_x] + (s1 + p1) * s[id_x+consts.pad] + (s2 + p2) * s[id_x+2*consts.pad];
+		t2 = (s1 - p1) * s[id_x] + (q + y * y * w) * s[id_x+consts.pad] + (s3 + p3) * s[id_x+2*consts.pad];
+		t3 = (s2 - p2) * s[id_x] + (s3 - p3) * s[id_x+consts.pad] + (q + x * x * w) * s[id_x+2*consts.pad];
+		//temp_x=s[id_x]-float(t1);
+		//temp_y=s[id_x+consts.pad]-float(t2);
+		//temp_z=s[id_x+2*consts.pad]-float(t3);
+		//double t_norm=1.0;//sqrt(t1*t1+t2*t2+t3*t3);
+		s[id_x] =float(t1);//scaling;//sd[id_x];//t1;
+		s[id_x+consts.pad] = float(t2);//iteration[gl_WorkGroupID.x];//sd[id_x+consts.pad];// t2;
+		s[id_x+2*consts.pad] =float(t3);//sd[id_x+consts.pad*2];//t3;
+	};/*
+	float max = temp_x*temp_x+temp_y*temp_y+temp_z*temp_z;
+	
+	max = subgroupInclusiveMax(max);
+
+	if (gl_SubgroupInvocationID == gl_SubgroupSize - 1)
+	{
+		sdata[gl_SubgroupID] = max;
+	}
+
+	memoryBarrierShared();
+	barrier();
+
+	if (gl_SubgroupID == 0)
+	{
+		float warpMax = gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID] : 0;
+		warpMax = subgroupInclusiveMax(warpMax);
+		if (gl_SubgroupInvocationID == 0)
+		{
+			partial_max[gl_WorkGroupID.x] = warpMax;
+		}
+	}*/
+}	

@@ -6,8 +6,7 @@
 #include <utility/Exception.hpp>
 #include <utility/Constants.hpp>
 
-#include <sstream>
-#include <iomanip>
+#include <algorithm>
 
 using namespace Utility;
 
@@ -19,23 +18,22 @@ namespace Engine
         // Sender name for log messages
         this->SenderName = Log_Sender::All;
 
-        // Default history contains force_max_abs_component
+        // Default history contains max_torque
         this->history = std::map<std::string, std::vector<scalar>>{
-            {"force_max_abs_component", {this->force_max_abs_component}} };
+            {"max_torque", {this->max_torque}} };
 
         // TODO: is this a good idea?
-        this->n_iterations     = this->parameters->n_iterations;
-        this->n_iterations_log = this->parameters->n_iterations_log;
-        if (this->n_iterations_log > 0)
-            this->n_log        = this->n_iterations / this->n_iterations_log;
-        else
-            this->n_log        = 0;
+        this->n_iterations     = std::max(long(1), this->parameters->n_iterations);
+        this->n_iterations_log = std::min(this->parameters->n_iterations_log, this->n_iterations);
+        if( this->n_iterations_log <= long(0) )
+            this->n_iterations_log = this->n_iterations;
+        this->n_log            = this->n_iterations / this->n_iterations_log;
 
         // Setup timings
         for (int i = 0; i<7; ++i) this->t_iterations.push_back(system_clock::now());
         this->ips = 0;
         this->starttime = Timing::CurrentDateTime();
-
+        //this->groupedIterations = std::max(1, 32 * 1024 * 1024 / nos);
 
         // Printing precision for scalars
         #ifdef CORE_SCALAR_TYPE_FLOAT
@@ -59,12 +57,12 @@ namespace Engine
 
         //---- Initial save
         this->Save_Current(this->starttime, this->iteration, true, false);
-
+        
         //---- Iteration loop
-        for ( this->iteration = 0; 
-              this->ContinueIterating() &&
-              !this->Walltime_Expired(t_current - t_start); 
-              ++this->iteration )
+        for( this->iteration = 0;
+             this->ContinueIterating() &&
+             !this->Walltime_Expired(t_current - t_start);
+             this->iteration+= groupedIterations)
         {
             t_current = system_clock::now();
 
@@ -84,11 +82,11 @@ namespace Engine
 
             // Log Output every n_iterations_log steps
             bool log = false;
-            if (this->n_iterations_log > 0)
-                log = this->iteration > 0 && 0 == fmod(this->iteration, this->n_iterations_log);
-            if ( log )
+            if( this->n_iterations_log > 0 )
+                log =(( this->iteration > 0) && ((this->iteration / this->n_iterations_log)- (this->iteration-this->groupedIterations) / this->n_iterations_log >0));
+            if( log )
             {
-                ++step;
+                ++this->step;
                 this->Message_Step();
                 this->Save_Current(this->starttime, this->iteration, false, false);
             }
@@ -98,6 +96,7 @@ namespace Engine
         }
 
         //---- Log messages
+        this->step = this->iteration / this->n_iterations_log;
         this->Message_End();
 
         //---- Final save
@@ -114,7 +113,7 @@ namespace Engine
         {
             l_ips += Timing::SecondsPassed(t_iterations[i+1] - t_iterations[i]);
         }
-        this->ips = 1.0 / (l_ips / (t_iterations.size() - 1));
+        this->ips = scalar(this->groupedIterations) / (l_ips / (t_iterations.size() - 1));
         return this->ips;
     }
 
@@ -153,6 +152,16 @@ namespace Engine
         return {this->force_max_abs_component};
     }
 
+    scalar Method::getTorqueMaxNorm()
+    {
+        return this->max_torque;
+    }
+
+    std::vector<scalar> Method::getTorqueMaxNorm_All()
+    {
+        return {this->max_torque};
+    }
+
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////// Protected functions
@@ -182,9 +191,9 @@ namespace Engine
 
     bool Method::ContinueIterating()
     {
-        return  this->iteration < this->n_iterations &&
-                this->Iterations_Allowed() &&
-               !this->StopFile_Present();
+        return  this->iteration < this->n_iterations&&
+            this->Iterations_Allowed() &&
+            !this->StopFile_Present();
     }
 
     bool Method::Iterations_Allowed()
@@ -195,7 +204,7 @@ namespace Engine
 
     bool Method::Walltime_Expired(duration<scalar> dt_seconds)
     {
-        if (this->parameters->max_walltime_sec <= 0)
+        if( this->parameters->max_walltime_sec <= 0 )
             return false;
         else
             return dt_seconds.count() > this->parameters->max_walltime_sec;
@@ -231,7 +240,7 @@ namespace Engine
     void Method::Finalize()
     {
         // Not Implemented!
-        
+
         spirit_throw(Exception_Classifier::Not_Implemented, Log_Level::Error,
             "Tried to use Method::Save_Current() of the Method base class!");
     }

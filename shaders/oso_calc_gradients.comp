@@ -1,0 +1,61 @@
+#version 450
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#extension GL_ARB_gpu_shader_fp64 : enable
+
+layout (local_size_x = 1024, local_size_y = 1,local_size_z = 1) in;
+layout(binding = 0) buffer Data
+{
+   float grad [];
+};
+layout(binding = 1) readonly buffer Data2
+{
+   float spins [];
+};
+layout(binding = 2) readonly buffer Data3
+{
+   float forces [];
+};
+layout(std430, binding = 3) writeonly buffer PartialMax
+{
+   float partial_max[];
+};
+layout (constant_id = 1) const uint pad = 0;
+layout (constant_id = 2) const int sumSubGroupSize = 64;
+
+shared float sdata[sumSubGroupSize];
+
+void main() {
+	uint id_x=gl_GlobalInvocationID.x%pad+((gl_GlobalInvocationID.x/pad))*3*pad;
+    //grad[id_x]=(spins[id_x]*forces[id_x+pad]-spins[id_x+pad]*forces[id_x]);
+    //grad[id_x+pad]=(-spins[id_x+2*pad]*forces[id_x]+spins[id_x]*forces[id_x+2*pad]);
+    //grad[id_x+2*pad]=(spins[id_x+pad]*forces[id_x+2*pad]-spins[id_x+2*pad]*forces[id_x+pad]);
+	//grad[id_x]=-(spins[id_x+pad]*forces[id_x+2*pad]-spins[id_x+2*pad]*forces[id_x+pad]);
+    //grad[id_x+pad]=(-spins[id_x+2*pad]*forces[id_x]+spins[id_x]*forces[id_x+2*pad]);
+    //grad[id_x+2*pad]=-(spins[id_x]*forces[id_x+pad]-spins[id_x+pad]*forces[id_x]);
+	grad[id_x]=float(-(double(spins[id_x+pad])*double(forces[id_x+2*pad])-double(spins[id_x+2*pad])*double(forces[id_x+pad])));
+    grad[id_x+pad]=float((-double(spins[id_x+2*pad])*double(forces[id_x])+double(spins[id_x])*double(forces[id_x+2*pad])));
+    grad[id_x+2*pad]=float(-(double(spins[id_x])*double(forces[id_x+pad])-double(spins[id_x+pad])*double(forces[id_x])));
+	
+	float max = grad[id_x]*grad[id_x]+ grad[id_x+pad]*grad[id_x+pad]+grad[id_x+2*pad]*grad[id_x+2*pad];
+	
+	max = subgroupInclusiveMax(max);
+
+	if (gl_SubgroupInvocationID == gl_SubgroupSize - 1)
+	{
+		sdata[gl_SubgroupID] = max;
+	}
+
+	memoryBarrierShared();
+	barrier();
+
+	if (gl_SubgroupID == 0)
+	{
+		float warpMax = gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID] : 0;
+		warpMax = subgroupInclusiveMax(warpMax);
+		if (gl_SubgroupInvocationID == 0)
+		{
+			partial_max[gl_WorkGroupID.x] = warpMax;
+		}
+	}
+
+}

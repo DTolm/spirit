@@ -29,7 +29,7 @@ namespace Engine
 
         // General Hamiltonian functions
         void Hessian(const vectorfield & spins, MatrixX & hessian) override;
-        void Gradient(const vectorfield & spins, vectorfield & gradient) override;
+        void Gradient(const vectorfield & spins, vectorfield & gradient, VulkanCompute::ComputeApplication* app) override;
         void Energy_Contributions_per_Spin(const vectorfield & spins, std::vector<std::pair<std::string, scalarfield>> & contributions) override;
 
         // Calculate the total energy for a single spin

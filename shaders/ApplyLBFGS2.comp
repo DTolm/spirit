@@ -1,0 +1,80 @@
+#version 450
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+
+layout (local_size_x_id = 1) in;
+layout (constant_id = 2) const int sumSubGroupSize = 64;
+
+layout(binding = 0) writeonly buffer Data0
+{
+   float d_a [];
+};
+layout(binding = 1) writeonly buffer Data1
+{
+   float d_g [];
+};
+layout(binding = 2) writeonly buffer Data2
+{
+   float sd [];
+};
+layout(binding = 3) readonly buffer Data3
+{
+   float grad [];
+};
+layout(binding = 4) writeonly buffer Data4
+{
+   float grad_pr [];
+};
+layout(binding = 5) writeonly buffer Data5
+{
+   float q_vec [];
+};
+layout(binding = 6) buffer control_variables
+{
+   float control []; // 0-2 rho; 3-5 alpha;
+};
+layout(binding = 7) buffer local_iteration
+{
+   uint iteration []; // 
+};
+layout(binding = 8) readonly buffer Data6
+{
+   float reduceResults[];
+};
+
+layout(push_constant) uniform PushConsts
+{
+  uint num_mem;
+  uint nos;
+  uint pad;
+  float eps;
+  uint k;
+  float max_move;
+} consts;
+
+void main() {
+	if (iteration[gl_WorkGroupID.x]!=0){
+		uint i=iteration[gl_WorkGroupID.x]%consts.num_mem;
+		float r_inv=reduceResults[0];
+		if(r_inv>consts.eps){
+			if (gl_LocalInvocationID.x==gl_WorkGroupSize.x-1){
+	
+				control[i+2*consts.num_mem*gl_WorkGroupID.x]=1.0f/r_inv;
+			}
+			q_vec[gl_GlobalInvocationID.x]=grad[gl_GlobalInvocationID.x];
+		}else{
+			grad_pr[gl_GlobalInvocationID.x]=grad[gl_GlobalInvocationID.x];
+			sd[gl_GlobalInvocationID.x]=-grad[gl_GlobalInvocationID.x];
+			for (uint j=0;j<consts.num_mem;j++){
+				d_a[gl_GlobalInvocationID.x+j*consts.nos*3]=0;
+				d_g[gl_GlobalInvocationID.x+j*consts.nos*3]=0;
+				if (gl_LocalInvocationID.x==gl_WorkGroupSize.x-1){
+					control[j+2*consts.num_mem*gl_WorkGroupID.x]=0;//rho
+				}
+			}
+			barrier();
+			if (gl_LocalInvocationID.x==gl_WorkGroupSize.x-1){	
+				iteration[gl_WorkGroupID.x]=0;
+			}
+		}
+	}
+}

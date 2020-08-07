@@ -1,0 +1,98 @@
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+
+#define WIDTH 512
+#define HEIGHT 512
+#define DEPTH 1
+#define WORKGROUP_SIZE 32
+layout (local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = 1 ) in;
+
+struct Region{
+  float Ms;
+  float Aexch;
+  float Dmi;
+  float external_field_magnitude;
+  vec3 external_field_normal;
+  int n_anisotropies;
+  float anisotropy_magnitudes[2];
+  vec3 anisotropy_normals[2];
+};
+
+layout(binding = 0) buffer Spins_Buf
+{
+   vec3 spins[];
+};
+
+layout(binding = 1) buffer Gradient_Buf
+{
+   vec3 gradient[];
+};
+layout(binding = 2) buffer Regions_Book
+{
+   Region regions_book[];
+};
+layout(binding = 3) buffer Regions_Buf
+{
+   int regions[];
+};
+void main() {
+
+  /*
+  In order to fit the work into workgroups, some unnecessary threads are launched.
+  We terminate those threads here.
+  */
+  if(gl_GlobalInvocationID.x >= WIDTH || gl_GlobalInvocationID.y >= HEIGHT || gl_GlobalInvocationID.z >= DEPTH)
+    return;
+  int x = int(gl_GlobalInvocationID.x);
+  int xl = x-1;
+  if(xl==0) xl=x;
+  int xr = x+1;
+  if(xr==WIDTH) xr=x;
+  int y = int(gl_GlobalInvocationID.y);
+  int yl = y-1;
+  if(yl==0) yl=y;
+  int yr = y+1;
+  if(yr==HEIGHT) yr=y;
+  int z = int(gl_GlobalInvocationID.z);
+  int zl = z-1;
+  if(zl==0) zl=z;
+  int zr = z+1;
+  if(zr==DEPTH) zr=z;
+
+  float cell_sizes[3]={2e-9,2e-9,5e-9};
+  int icell=x+y*WIDTH+z*WIDTH*HEIGHT;
+  //Zeeman
+  float m0 = (4 * 3.14159265358979)*1e-7;
+  gradient[icell] -= m0*regions_book[regions[icell]].Ms * regions_book[regions[icell]].external_field_magnitude*regions_book[regions[icell]].external_field_normal;
+  //Anisotropy
+  for (int i = 0; i < regions_book[regions[icell]].n_anisotropies; i++)
+  {
+    gradient[icell] -= 2.0 * regions_book[regions[icell]].anisotropy_magnitudes[i] / regions_book[regions[icell]].Ms * regions_book[regions[icell]].anisotropy_normals[i] * dot(regions_book[regions[icell]].anisotropy_normals[i],spins[icell]);
+  }
+
+  //Exchange
+  int icell_plus=xr+y*WIDTH+z*WIDTH*HEIGHT;
+  int icell_minus=xl+y*WIDTH+z*WIDTH*HEIGHT;
+	gradient[icell][0] -= 2 * regions_book[regions[icell]].Aexch/regions_book[regions[icell]].Ms * (spins[icell_plus][0] - 2 * spins[icell][0] + spins[icell_minus][0]) / (cell_sizes[0]) / (cell_sizes[0]);
+	gradient[icell][1] -= 2 * regions_book[regions[icell]].Aexch/regions_book[regions[icell]].Ms * (spins[icell_plus][1] - 2 * spins[icell][1] + spins[icell_minus][1]) / (cell_sizes[0]) / (cell_sizes[0]);
+	gradient[icell][2] -= 2 * regions_book[regions[icell]].Aexch/regions_book[regions[icell]].Ms * (spins[icell_plus][2] - 2 * spins[icell][2] + spins[icell_minus][2]) / (cell_sizes[0]) / (cell_sizes[0]);
+
+  gradient[icell][0] += 2 * regions_book[regions[icell]].Dmi /regions_book[regions[icell]].Ms * (spins[icell_plus][2] - spins[icell_minus][2]) / (cell_sizes[0]) / 2;
+  gradient[icell][2] +=- 2 * regions_book[regions[icell]].Dmi /regions_book[regions[icell]].Ms * (spins[icell_plus][0] - spins[icell_minus][0]) / (cell_sizes[0]) / 2;
+
+  icell_plus=x+yr*WIDTH+z*WIDTH*HEIGHT;
+  icell_minus=x+yl*WIDTH+z*WIDTH*HEIGHT;
+  gradient[icell][0] -= 2 * regions_book[regions[icell]].Aexch/regions_book[regions[icell]].Ms * (spins[icell_plus][0] - 2 * spins[icell][0] + spins[icell_minus][0]) / (cell_sizes[1]) / (cell_sizes[1]);
+	gradient[icell][1] -= 2 * regions_book[regions[icell]].Aexch/regions_book[regions[icell]].Ms * (spins[icell_plus][1] - 2 * spins[icell][1] + spins[icell_minus][1]) / (cell_sizes[1]) / (cell_sizes[1]);
+	gradient[icell][2] -= 2 * regions_book[regions[icell]].Aexch/regions_book[regions[icell]].Ms * (spins[icell_plus][2] - 2 * spins[icell][2] + spins[icell_minus][2]) / (cell_sizes[1]) / (cell_sizes[1]);
+
+  gradient[icell][1] += 2 * regions_book[regions[icell]].Dmi /regions_book[regions[icell]].Ms * (spins[icell_plus][2] - spins[icell_minus][2]) / (cell_sizes[1]) / 2;
+	gradient[icell][2] += - 2 * regions_book[regions[icell]].Dmi /regions_book[regions[icell]].Ms * (spins[icell_plus][1] - spins[icell_minus][1]) / (cell_sizes[1]) / 2;
+
+  icell_plus=x+y*WIDTH+zr*WIDTH*HEIGHT;
+  icell_minus=x+y*WIDTH+zl*WIDTH*HEIGHT;
+  gradient[icell][0] -= 2 * regions_book[regions[icell]].Aexch/regions_book[regions[icell]].Ms * (spins[icell_plus][0] - 2 * spins[icell][0] + spins[icell_minus][0]) / (cell_sizes[2]) / (cell_sizes[2]);
+  gradient[icell][1] -= 2 * regions_book[regions[icell]].Aexch/regions_book[regions[icell]].Ms * (spins[icell_plus][1] - 2 * spins[icell][1] + spins[icell_minus][1]) / (cell_sizes[2]) / (cell_sizes[2]);
+  gradient[icell][2] -= 2 * regions_book[regions[icell]].Aexch/regions_book[regions[icell]].Ms * (spins[icell_plus][2] - 2 * spins[icell][2] + spins[icell_minus][2]) / (cell_sizes[2]) / (cell_sizes[2]);
+
+}

@@ -7,6 +7,7 @@
 
 #include "Spirit_Defines.h"
 #include <engine/Vectormath_Defines.hpp>
+#include <data/Vulkan_Compute.hpp>
 
 namespace Engine
 {
@@ -46,7 +47,8 @@ namespace Engine
             override it if you want to get proper performance.
             This function is the fallback for derived classes where it has not been overridden.
         */
-        virtual void Gradient(const vectorfield & spins, vectorfield & gradient);
+        virtual void Gradient(const vectorfield & spins, vectorfield & gradient, VulkanCompute::ComputeApplication* app=NULL);
+        virtual void init_vulkan(VulkanCompute::ComputeApplication* app);
 
         /*
             Calculate the energy gradient of a spin configuration.
@@ -70,11 +72,24 @@ namespace Engine
         virtual const std::string& Name();
 
         // Boundary conditions
-        intfield boundary_conditions; // [3] (a, b, c)
 
+        intfield boundary_conditions; // [3] (a, b, c)
+        int idx_zeeman, idx_anisotropy, idx_exchange, idx_dmi, idx_ddi;
+        scalar picoseconds_passed=0;
+		#ifndef SPIRIT_LOW_MEMORY
+            scalar* gradient_contributions_per_spin;
+			// Energy contributions per spin
+            std::vector<std::pair<std::string, scalar>> energy_array;
+
+            std::vector<std::pair<std::string, scalarfield>> energy_contributions_per_spin;
+		#endif
+		#ifdef SPIRIT_LOW_MEMORY
+			// Energy contributions
+			std::vector<std::pair<std::string, scalar>> energy_array;
+		#endif
     protected:
         // Energy contributions per spin
-        std::vector<std::pair<std::string, scalarfield>> energy_contributions_per_spin;
+        //std::vector<std::pair<std::string, scalarfield>> energy_contributions_per_spin;
 
         std::mt19937 prng;
         std::uniform_int_distribution<int> distribution_int;

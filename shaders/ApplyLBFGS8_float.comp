@@ -1,0 +1,92 @@
+#version 450
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+
+layout (local_size_x_id = 1) in;
+layout (constant_id = 2) const int sumSubGroupSize = 64;
+
+layout(binding = 0) buffer Data
+{
+   float s [];
+};
+layout(binding = 1) buffer Data0
+{
+   float sd [];
+};
+layout(binding = 2) buffer local_iteration
+{
+   uint iteration []; // 0-local_iter;
+};
+layout(binding = 3) readonly buffer Data1
+{
+   float reduceResults[];
+};
+
+layout(binding = 4) buffer MaxMove
+{
+   float maxmove [];
+};
+layout(binding = 5) buffer Data2
+{
+   float s_copy [];
+};
+
+layout(push_constant) uniform PushConsts
+{
+  uint num_mem;
+  uint nos;
+  uint pad;
+  float eps;
+  uint k;
+  float max_move;
+} consts;
+shared float sdata[sumSubGroupSize];
+
+void main() {
+
+	float theta_rms=sqrt(reduceResults[0]/consts.nos);
+	float scaling = (theta_rms>maxmove[1]) ? maxmove[1]/theta_rms : 1.0;
+	uint id_x=gl_GlobalInvocationID.x;
+	s_copy[id_x]=s[id_x];
+	s_copy[id_x+consts.pad]=s[id_x+consts.pad];
+	s_copy[id_x+2*consts.pad]=s[id_x+2*consts.pad];
+	sd[id_x]*=scaling;
+	sd[id_x+consts.pad]*=scaling;
+	sd[id_x+2*consts.pad]*=scaling;
+	//float temp_x=0;
+	//float temp_y=0;
+	//float temp_z=0;
+	//float s_norm=1.0;
+	float theta = sqrt(sd[id_x]*sd[id_x]+sd[id_x+consts.pad]*sd[id_x+consts.pad]+sd[id_x+2*consts.pad]*sd[id_x+2*consts.pad]);
+	if (theta > 1.0e-20) // if theta is too small we do nothing
+	{
+		float theta_inv = 1.0/theta;
+		float q = cos(theta);
+		float w = 1 - q;
+		float x = -sd[id_x]* theta_inv;
+		float y = -sd[id_x+consts.pad]* theta_inv;
+		float z = -sd[id_x+2*consts.pad]* theta_inv;
+		float s1 = x * y * w;
+		float s2 = x * z * w;
+		float s3 = z * y * w;
+		float p1 = z * sin(theta);
+		float p2 = y * sin(theta);
+		float p3 = x * sin(theta);
+		float t1, t2, t3;
+	
+		t1 = (q + x* x * w) * s[id_x] + (s1 - p1) * s[id_x+consts.pad] + (s2 + p2) * s[id_x+2*consts.pad];
+		t2 = (s1 + p1) * s[id_x] + (q + y * y * w) * s[id_x+consts.pad] + (s3 - p3) * s[id_x+2*consts.pad];
+		t3 = (s2 - p2) * s[id_x] + (s3 + p3) * s[id_x+consts.pad] + (q + z * z * w) * s[id_x+2*consts.pad];
+		
+		s[id_x] = t1;
+		s[id_x+consts.pad] = t2;
+		s[id_x+2*consts.pad] = t3;
+	};
+	
+	if (gl_LocalInvocationID.x==gl_WorkGroupSize.x-1)
+	{
+		iteration[gl_WorkGroupID.x]=iteration[gl_WorkGroupID.x]+1;
+		iteration[gl_WorkGroupID.x+gl_NumWorkGroups.x]=iteration[gl_WorkGroupID.x+gl_NumWorkGroups.x]+1;
+		iteration[gl_WorkGroupID.x+2*gl_NumWorkGroups.x]=iteration[gl_WorkGroupID.x+2*gl_NumWorkGroups.x]+1;
+	}
+
+}

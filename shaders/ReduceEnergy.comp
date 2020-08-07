@@ -1,0 +1,86 @@
+#version 450
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+
+layout(std430, binding = 0) readonly buffer Input
+{
+   float inputs[];
+};
+layout(std430, binding = 1) readonly buffer Input2
+{
+   float inputs2[];
+};
+layout(std430, binding = 2) writeonly buffer PartialSums
+{
+   float partial_sums[];
+};
+
+layout (local_size_x_id = 1) in;
+layout (constant_id = 2) const int sumSubGroupSize = 64;
+
+layout(push_constant) uniform PushConsts
+{
+  uint n;
+  uint offset1;
+  uint offset2;
+  uint pad;
+} consts;
+
+shared float sdata[4*sumSubGroupSize];
+
+void main()
+{
+    float dot = 0.0;
+	float mx=0.0;
+	float my=0.0;
+	float mz=0.0;
+	uint id_x=gl_GlobalInvocationID.x%consts.pad+((gl_GlobalInvocationID.x/consts.pad))*3*consts.pad;
+	
+    if (gl_GlobalInvocationID.x < consts.n)
+    {
+        dot = inputs[(consts.offset1+id_x)]*inputs2[(consts.offset2+id_x)];
+		dot += inputs[(consts.offset1+id_x)+consts.pad]*inputs2[(consts.offset2+id_x)+consts.pad];
+		dot += inputs[(consts.offset1+id_x)+2*consts.pad]*inputs2[(consts.offset2+id_x)+2*consts.pad];
+		mx = inputs2[(consts.offset2+id_x)];
+		my = inputs2[(consts.offset2+id_x)+consts.pad];
+		mz = inputs2[(consts.offset2+id_x)+2*consts.pad];
+    }
+
+    dot = subgroupAdd(dot);
+	mx = subgroupAdd(mx);
+	my = subgroupAdd(my);
+    mz = subgroupAdd(mz);
+	if (gl_SubgroupInvocationID == 0)
+    {
+        sdata[gl_SubgroupID] = dot;
+		sdata[gl_SubgroupID+sumSubGroupSize] = mx;
+		sdata[gl_SubgroupID+2*sumSubGroupSize] = my;
+		sdata[gl_SubgroupID+3*sumSubGroupSize] = mz;
+    }
+
+    memoryBarrierShared();
+    barrier();
+
+    if (gl_SubgroupID == 0)
+    {
+        dot = gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID] : 0;
+        dot = subgroupAdd(dot);
+		
+		mx = gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID+sumSubGroupSize] : 0;
+        mx = subgroupAdd(mx);
+		
+		my = gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID+2*sumSubGroupSize] : 0;
+        my = subgroupAdd(my);
+		
+		mz = gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID+3*sumSubGroupSize] : 0;
+        mz = subgroupAdd(mz);
+
+    }
+
+    if (gl_LocalInvocationID.x == 0)
+    {
+        partial_sums[gl_WorkGroupID.x] = dot;
+		partial_sums[gl_WorkGroupID.x+gl_NumWorkGroups.x] = mx;
+		partial_sums[gl_WorkGroupID.x+2*gl_NumWorkGroups.x] = my;
+		partial_sums[gl_WorkGroupID.x+3*gl_NumWorkGroups.x] = mz;
+    }
+}

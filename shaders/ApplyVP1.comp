@@ -1,0 +1,72 @@
+#version 450
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+
+layout (local_size_x_id = 1) in;
+layout (constant_id = 2) const int sumSubGroupSize = 64;
+
+layout(binding = 0) readonly buffer Data0
+{
+   float grad [];
+};
+layout(binding = 1) readonly buffer Data1
+{
+   float grad_pr [];
+};
+layout(std430, binding = 2) writeonly buffer PartialSums
+{
+   float partial_sums[];
+};
+layout(binding = 3) readonly buffer Data4
+{
+   float reduceResults[];
+};
+
+layout(push_constant) uniform PushConsts
+{
+  uint n;
+  uint pad;
+  float m_temp_inv;
+} consts;
+
+shared float sdata[sumSubGroupSize];
+shared float sdata2[sumSubGroupSize];
+
+void main() {
+    float dot = 0.0;
+	float dot2 = 0.0;
+	float beta= reduceResults[0]/reduceResults[1];
+	if (beta>0) beta=0;
+    if ( gl_GlobalInvocationID.x  < 3*consts.n)
+    {	
+        dot = (beta*grad_pr[gl_GlobalInvocationID.x  ]-consts.m_temp_inv*(grad_pr[gl_GlobalInvocationID.x  ]+grad[gl_GlobalInvocationID.x  ]))*grad[(gl_GlobalInvocationID.x  )];
+        dot2 = grad[gl_GlobalInvocationID.x  ]*grad[(gl_GlobalInvocationID.x  )];
+        
+    }
+    dot = subgroupAdd(dot);
+	dot2 = subgroupAdd(dot2);
+
+    if (gl_SubgroupInvocationID == 0)
+    {
+        sdata[gl_SubgroupID] = dot;
+		sdata2[gl_SubgroupID] = dot2;
+    }
+
+    memoryBarrierShared();
+    barrier();
+
+    if (gl_SubgroupID == 0)
+    {
+        dot = gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID] : 0;
+        dot = subgroupAdd(dot);
+		
+		dot2 = gl_SubgroupInvocationID < gl_NumSubgroups ? sdata2[gl_SubgroupInvocationID] : 0;
+        dot2 = subgroupAdd(dot2);
+
+    }
+    if (gl_LocalInvocationID.x == 0)
+    {
+        partial_sums[gl_WorkGroupID.x] = dot;
+		partial_sums[gl_WorkGroupID.x+gl_NumWorkGroups.x] = dot2;
+		//partial_sums2[gl_WorkGroupID.x] = dot2;
+    }
+}

@@ -1,0 +1,387 @@
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+
+#define WORKGROUP_SIZE 32
+const float M_PI = radians(180); // #define M_PI 3.14159265358979323846
+const float M_SQRT1_2 = 1.0 / sqrt(2.0); // #define M_SQRT1_2 0.707106781186547524401
+const float mult=4*M_PI*1e-7;
+const uint num_gradient_components=5;
+
+layout (local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = 1 ) in;
+layout (constant_id = 1) const uint sumSubGroupSize = 64;
+layout (constant_id = 2) const uint num_components_write = 1;
+layout (constant_id = 3) const uint ddi_bool = 0;
+layout (constant_id = 4) const uint damping = 0;
+layout (constant_id = 5) const uint save_energy = 0;
+struct Region{
+  float Ms;
+  float Ms_inv;
+  float minMs;
+  float minMs_inv;
+  float alpha;
+  float Aexch;
+  float Aexch_inv;
+  float Dmi; 
+  float DDI;
+  float external_field_magnitude;
+  float external_field_normal[3];
+  int n_anisotropies;
+  float anisotropy_magnitudes[2];
+  float anisotropy_normals[2*3];
+  float cell_sizes[3];
+  float cell_sizes_inv[3];
+};
+
+layout(binding = 0) readonly buffer Spins_Buf
+{
+   float spins[];
+};
+
+layout(binding = 1) buffer Gradient_Buf
+{
+   float gradient[];
+};
+layout(binding = 2) readonly buffer Regions_Book
+{
+   Region regions_book[];
+};
+layout(binding = 3) readonly buffer Regions_Buf
+{
+   int regions[];
+};
+
+layout(binding = 4) uniform UBO {
+    uint WIDTH;
+    uint HEIGHT;
+    uint DEPTH;
+    uint n;
+    uint npad;
+	uint npad2;
+};
+layout(std430, binding = 5) writeonly buffer PartialSums
+{
+   float partial_sums[];
+};
+
+//layout (constant_id = 0) const int FORCE_TYPE = 0;
+shared float sdata[(num_gradient_components+3)*sumSubGroupSize];
+
+void main() {  
+	//return;
+	//if(gl_GlobalInvocationID.x >= WIDTH || gl_GlobalInvocationID.y >= HEIGHT || gl_GlobalInvocationID.z >= DEPTH)
+	//  return;
+	uint pad= WIDTH*HEIGHT;
+	uint x = gl_GlobalInvocationID.x;
+	uint xl = (x==0) ? x : x-1;
+	uint xll = (x==1) ? xl : x-2;
+	xll = (x==0) ? x : xll;
+	uint xr = (x==WIDTH-1) ? x : x+1;
+	uint xrr = (x==WIDTH-2) ? xr : x+2;
+	xrr = (x==WIDTH-1) ? x : xrr;
+	
+	uint y = gl_GlobalInvocationID.y;
+	uint yl = (y==0) ? y : y-1;
+	uint yll = (y==1) ? yl : y-2;
+	yll = (y==0) ? y : yll;
+	uint yr = (y==HEIGHT-1) ? y : y+1;
+	uint yrr = (y==HEIGHT-2) ? yr : y+2;
+	yrr = (y==HEIGHT-1) ? y : yrr;
+	
+	uint z = gl_GlobalInvocationID.z;
+	uint zl = (z==0) ? z : z-1;
+	uint zll = (z==1) ? zl : z-2;
+	zll = (z==0) ? z : zll;
+	uint zr = (z==DEPTH-1) ? z : z+1;
+	uint zrr = (z==DEPTH-2) ? zr : z+2;
+	zrr = (z==DEPTH-1) ? z : zrr;
+	
+	uint icell=x+y*WIDTH+3*z*WIDTH*HEIGHT;
+	uint icell_nonpad=x+y*WIDTH+z*WIDTH*HEIGHT;
+	
+	float gradient_values_x[num_gradient_components];
+	float gradient_values_y[num_gradient_components];
+	float gradient_values_z[num_gradient_components];
+	for (uint i=0; i < num_gradient_components;i++){
+		gradient_values_x[i]=0;
+		gradient_values_y[i]=0;
+		gradient_values_z[i]=0;
+	}
+	float gradient_total[3]={0.0,0.0,0.0};
+	
+	if (regions_book[regions[icell_nonpad]].Ms!=0)
+	{
+		//return;
+		//Zeeman
+		//float m0 = (4 * 3.14159265358979)*1e-7;
+		gradient_values_x[0] = -mult*regions_book[regions[icell_nonpad]].Ms * regions_book[regions[icell_nonpad]].external_field_magnitude*regions_book[regions[icell_nonpad]].external_field_normal[0];
+		gradient_values_y[0] = -mult*regions_book[regions[icell_nonpad]].Ms * regions_book[regions[icell_nonpad]].external_field_magnitude*regions_book[regions[icell_nonpad]].external_field_normal[1];
+		gradient_values_z[0] = -mult*regions_book[regions[icell_nonpad]].Ms * regions_book[regions[icell_nonpad]].external_field_magnitude*regions_book[regions[icell_nonpad]].external_field_normal[2];
+		/*
+		//Zeeman - Custom field 
+		if ((x-WIDTH*0.5f)*(x-WIDTH*0.5f)+(y-HEIGHT*0.5f)*(y-HEIGHT*0.5f) > 0.2*WIDTH*HEIGHT){
+		  float norm[3];
+		  norm[2]=0;
+		  if (x-WIDTH*0.5f==0) { 
+			if (y-HEIGHT*0.5f>0) { 
+				norm[0]=-1; 
+				norm[1]=0;
+			} else {
+				norm[0]=1; 
+				norm[1]=0;
+			}
+		  } 
+		  else {
+			if (y-HEIGHT*0.5f==0) { 
+				if (x-WIDTH*0.5f>0) { 
+				norm[0]=0; 
+				norm[1]=1;
+				} else {
+				norm[0]=0; 
+				norm[1]=-1;
+				}
+			} else {
+				if (y-HEIGHT*0.5f>0) { 
+					norm[0]=-1; 
+					norm[1]=(x-WIDTH*0.5f)/(y-HEIGHT*0.5f);
+					norm[0]=norm[0]/sqrt(norm[0]*norm[0]+norm[1]*norm[1]);
+					norm[1]=norm[1]/sqrt(norm[0]*norm[0]+norm[1]*norm[1]);}
+				else{
+					norm[0]=1; 
+					norm[1]=-(x-WIDTH*0.5f)/(y-HEIGHT*0.5f);
+					norm[0]=norm[0]/sqrt(norm[0]*norm[0]+norm[1]*norm[1]);
+					norm[1]=norm[1]/sqrt(norm[0]*norm[0]+norm[1]*norm[1]);
+				}
+			}
+		  }
+		  
+		  gradient[icell] -= mult*regions_book[regions[icell_nonpad]].Ms * 1e2*norm[0];
+		  gradient[icell+pad] -= mult*regions_book[regions[icell_nonpad]].Ms * 1e2*norm[1];
+		  //gradient[icell+2*pad] -= mult*regions_book[regions[icell_nonpad]].Ms * regions_book[regions[icell_nonpad]].external_field_magnitude*regions_book[regions[icell_nonpad]].external_field_normal[2];
+		}*/
+		//Anisotropy
+		float prefactor=0;
+		for (uint i = 0; i < regions_book[regions[icell_nonpad]].n_anisotropies; i++)
+		{
+			prefactor = 2.0 * regions_book[regions[icell_nonpad]].anisotropy_magnitudes[i] * regions_book[regions[icell_nonpad]].Ms_inv * (regions_book[regions[icell_nonpad]].anisotropy_normals[i*regions_book[regions[icell_nonpad]].n_anisotropies]*spins[icell]+regions_book[regions[icell_nonpad]].anisotropy_normals[i*regions_book[regions[icell_nonpad]].n_anisotropies+1]*spins[icell+pad]+regions_book[regions[icell_nonpad]].anisotropy_normals[i*regions_book[regions[icell_nonpad]].n_anisotropies+2]*spins[icell+2*pad]);
+			gradient_values_x[1] -=  regions_book[regions[icell_nonpad]].anisotropy_normals[i*regions_book[regions[icell_nonpad]].n_anisotropies]*prefactor;
+			gradient_values_y[1] -=  regions_book[regions[icell_nonpad]].anisotropy_normals[i*regions_book[regions[icell_nonpad]].n_anisotropies+1]*prefactor;
+			gradient_values_z[1] -=  regions_book[regions[icell_nonpad]].anisotropy_normals[i*regions_book[regions[icell_nonpad]].n_anisotropies+2]*prefactor;
+		}
+
+		//Exchange
+		
+		uint icell_plus =(regions_book[regions[xr+y*WIDTH+z*WIDTH*HEIGHT]].Ms!=0) ? xr+y*WIDTH+3*z*WIDTH*HEIGHT : icell;
+		uint icell_plus2 =(regions_book[regions[xrr+y*WIDTH+z*WIDTH*HEIGHT]].Ms!=0) ? xrr+y*WIDTH+3*z*WIDTH*HEIGHT : icell_plus;
+		uint icell_minus=(regions_book[regions[xl+y*WIDTH+z*WIDTH*HEIGHT]].Ms!=0) ? xl+y*WIDTH+3*z*WIDTH*HEIGHT : icell;
+		uint icell_minus2=(regions_book[regions[xll+y*WIDTH+z*WIDTH*HEIGHT]].Ms!=0) ? xll+y*WIDTH+3*z*WIDTH*HEIGHT : icell_minus;
+		
+		prefactor= regions_book[regions[icell_nonpad]].Aexch*regions_book[regions[icell_nonpad]].Ms_inv* (regions_book[regions[icell_nonpad]].cell_sizes_inv[0]) /6;
+		
+		if (icell_plus==icell){//boundary
+			gradient_values_x[2] -= prefactor*((-15*spins[icell] + 16*spins[icell_minus]-spins[icell_minus2])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[0])-7*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell+2*pad]);
+			gradient_values_y[2] -= prefactor*(-15*spins[icell+pad] + 16*spins[icell_minus+pad]-spins[icell_minus2+pad])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[0]);
+			gradient_values_z[2] -= prefactor*((-15*spins[icell+2*pad] + 16*spins[icell_minus+2*pad]-spins[icell_minus2+2*pad])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[0])+7*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell]);
+			
+			gradient_values_x[3] -= regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * ((spins[icell+2*pad] - spins[icell_minus+2*pad]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[0])+0.5*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell]);
+			gradient_values_z[3] += regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * ((spins[icell] - spins[icell_minus]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[0])-0.5*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell+2*pad]);
+		} 
+		else{
+			if (icell_plus2==icell_plus){
+				gradient_values_x[2] -= prefactor*((15*spins[icell_plus]-30*spins[icell] + 16*spins[icell_minus]-spins[icell_minus2])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[0])+0.5*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell_plus+2*pad]);
+				gradient_values_y[2] -= prefactor*(15*spins[icell_plus+pad]-30*spins[icell+pad] + 16*spins[icell_minus+pad]-spins[icell_minus2+pad])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[0]);
+				gradient_values_z[2] -= prefactor*((15*spins[icell_plus+2*pad]-30*spins[icell+2*pad] + 16*spins[icell_minus+2*pad]-spins[icell_minus2+2*pad])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[0])-0.5*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell_plus]);
+				
+				gradient_values_x[3] -= regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * (spins[icell_plus+2*pad] - spins[icell_minus+2*pad]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[0]);
+				gradient_values_z[3] += regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * (spins[icell_plus] - spins[icell_minus]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[0]);
+			}else{
+				if (icell_minus==icell){//boundary
+					gradient_values_x[2] -= prefactor*((-spins[icell_plus2]+16*spins[icell_plus] -15*spins[icell])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[0])+7*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell+2*pad]);
+					gradient_values_y[2] -= prefactor*(-spins[icell_plus2+pad]+16*spins[icell_plus+pad] -15*spins[icell+pad] )* (regions_book[regions[icell_nonpad]].cell_sizes_inv[0]);
+					gradient_values_z[2] -= prefactor*((-spins[icell_plus2+2*pad]+16*spins[icell_plus+2*pad] -15*spins[icell+2*pad])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[0])-7*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell]);
+			
+					gradient_values_x[3] -= regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * ((spins[icell_plus+2*pad] - spins[icell+2*pad]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[0])+0.5*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell]);
+					gradient_values_z[3] += regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * ((spins[icell_plus] - spins[icell]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[0])-0.5*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell+2*pad]);
+				
+				} else {
+					if (icell_minus2==icell_minus){//boundary
+					gradient_values_x[2] -= prefactor*((-spins[icell_plus2]+16*spins[icell_plus] -30*spins[icell]+15*spins[icell_minus])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[0])-0.5*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell_minus+2*pad]);
+					gradient_values_y[2] -= prefactor*(-spins[icell_plus2+pad]+16*spins[icell_plus+pad] -30*spins[icell+pad] +15*spins[icell_minus+pad])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[0]);
+					gradient_values_z[2] -= prefactor*((-spins[icell_plus2+2*pad]+16*spins[icell_plus+2*pad] -30*spins[icell+2*pad]+15*spins[icell_minus+2*pad])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[0])+0.5*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell_minus]);
+			
+					gradient_values_x[3] -= regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * (spins[icell_plus+2*pad] - spins[icell_minus+2*pad]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[0]);
+					gradient_values_z[3] += regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * (spins[icell_plus] - spins[icell_minus]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[0]);
+					
+					} else {
+						gradient_values_x[2] -= prefactor*(-spins[icell_plus2]+16*spins[icell_plus] - 30 * spins[icell] + 16*spins[icell_minus]-spins[icell_minus2])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[0]);
+						gradient_values_y[2] -= prefactor*(-spins[icell_plus2+pad]+16*spins[icell_plus+pad] - 30 * spins[icell+pad] + 16*spins[icell_minus+pad]-spins[icell_minus2+pad])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[0]) ;
+						gradient_values_z[2] -= prefactor* (-spins[icell_plus2+2*pad]+16*spins[icell_plus+2*pad] - 30 * spins[icell+2*pad] + 16*spins[icell_minus+2*pad]-spins[icell_minus2+2*pad])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[0]) ;
+						
+						gradient_values_x[3] -= regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * (spins[icell_plus+2*pad] - spins[icell_minus+2*pad]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[0]);
+						gradient_values_z[3] += regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * (spins[icell_plus] - spins[icell_minus]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[0]);
+					}
+				}
+			}
+		}
+		
+		icell_plus =(regions_book[regions[x+yr*WIDTH+z*WIDTH*HEIGHT]].Ms!=0) ? x+yr*WIDTH+3*z*WIDTH*HEIGHT : icell;
+		icell_plus2 =(regions_book[regions[x+yrr*WIDTH+z*WIDTH*HEIGHT]].Ms!=0) ? x+yrr*WIDTH+3*z*WIDTH*HEIGHT : icell_plus;
+		icell_minus=(regions_book[regions[x+yl*WIDTH+z*WIDTH*HEIGHT]].Ms!=0) ? x+yl*WIDTH+3*z*WIDTH*HEIGHT : icell;
+		icell_minus2=(regions_book[regions[x+yll*WIDTH+z*WIDTH*HEIGHT]].Ms!=0) ? x+yll*WIDTH+3*z*WIDTH*HEIGHT : icell_minus;
+		
+		prefactor= regions_book[regions[icell_nonpad]].Aexch*regions_book[regions[icell_nonpad]].Ms_inv* (regions_book[regions[icell_nonpad]].cell_sizes_inv[1])/6;
+		
+		if (icell_plus==icell){//boundary
+			gradient_values_x[2] -= prefactor*(-15*spins[icell] + 16*spins[icell_minus]-spins[icell_minus2])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[1]);
+			gradient_values_y[2] -= prefactor*((-15*spins[icell+pad] + 16*spins[icell_minus+pad]-spins[icell_minus2+pad])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[1])-7*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell+2*pad]);
+			gradient_values_z[2] -= prefactor*((-15*spins[icell+2*pad] + 16*spins[icell_minus+2*pad]-spins[icell_minus2+2*pad])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[1])+7*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell+pad]);
+			
+			gradient_values_y[3] -= regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * ((spins[icell+2*pad] - spins[icell_minus+2*pad]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[1])+0.5*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell+pad]);
+			gradient_values_z[3] += regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * ((spins[icell+pad] - spins[icell_minus+pad]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[1])-0.5*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell+2*pad]);
+		} 
+		else{
+			if (icell_plus2==icell_plus){
+				gradient_values_x[2] -= prefactor*(15*spins[icell_plus]-30*spins[icell] + 16*spins[icell_minus]-spins[icell_minus2])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[1]);
+				gradient_values_y[2] -= prefactor*((15*spins[icell_plus+pad]-30*spins[icell+pad] + 16*spins[icell_minus+pad]-spins[icell_minus2+pad])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[1])+0.5*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell_plus+2*pad]);
+				gradient_values_z[2] -= prefactor*((15*spins[icell_plus+2*pad]-30*spins[icell+2*pad] + 16*spins[icell_minus+2*pad]-spins[icell_minus2+2*pad])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[1])-0.5*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell_plus+pad]);
+				
+				gradient_values_y[3] -= regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * (spins[icell_plus+2*pad] - spins[icell_minus+2*pad]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[1]);
+				gradient_values_z[3] += regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * (spins[icell_plus+pad] - spins[icell_minus+pad]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[1]);
+			}else{
+				if (icell_minus==icell){//boundary
+					gradient_values_x[2] -= prefactor*(-spins[icell_plus2]+16*spins[icell_plus] -15*spins[icell])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[1]);
+					gradient_values_y[2] -= prefactor*((-spins[icell_plus2+pad]+16*spins[icell_plus+pad] -15*spins[icell+pad] )* (regions_book[regions[icell_nonpad]].cell_sizes_inv[1])+7*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell+2*pad]);
+					gradient_values_z[2] -= prefactor*((-spins[icell_plus2+2*pad]+16*spins[icell_plus+2*pad] -15*spins[icell+2*pad])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[1])-7*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell+pad]);
+			
+					gradient_values_y[3] -= regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * ((spins[icell_plus+2*pad] - spins[icell+2*pad]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[1])+0.5*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell+pad]);
+					gradient_values_z[3] += regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * ((spins[icell_plus+pad] - spins[icell+pad]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[1])-0.5*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell+2*pad]);
+				
+				} else {
+					if (icell_minus2==icell_minus){//boundary
+					gradient_values_x[2] -= prefactor*(-spins[icell_plus2]+16*spins[icell_plus] -30*spins[icell]+15*spins[icell_minus])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[1]);
+					gradient_values_y[2] -= prefactor*((-spins[icell_plus2+pad]+16*spins[icell_plus+pad] -30*spins[icell+pad] +15*spins[icell_minus+pad])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[1])-0.5*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell_minus+2*pad]);
+					gradient_values_z[2] -= prefactor*((-spins[icell_plus2+2*pad]+16*spins[icell_plus+2*pad] -30*spins[icell+2*pad]+15*spins[icell_minus+2*pad])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[1])+0.5*regions_book[regions[icell_nonpad]].Dmi*regions_book[regions[icell_nonpad]].Aexch_inv*spins[icell_minus+pad]);
+			
+					gradient_values_y[3] -= regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * (spins[icell_plus+2*pad] - spins[icell_minus+2*pad]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[1]);
+					gradient_values_z[3] += regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * (spins[icell_plus+pad] - spins[icell_minus+pad]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[1]);
+					
+					} else {
+						gradient_values_x[2] -= prefactor*(-spins[icell_plus2]+16*spins[icell_plus] - 30 * spins[icell] + 16*spins[icell_minus]-spins[icell_minus2])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[1]);
+						gradient_values_y[2] -= prefactor*(-spins[icell_plus2+pad]+16*spins[icell_plus+pad] - 30 * spins[icell+pad] + 16*spins[icell_minus+pad]-spins[icell_minus2+pad])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[1]) ;
+						gradient_values_z[2] -= prefactor* (-spins[icell_plus2+2*pad]+16*spins[icell_plus+2*pad] - 30 * spins[icell+2*pad] + 16*spins[icell_minus+2*pad]-spins[icell_minus2+2*pad])* (regions_book[regions[icell_nonpad]].cell_sizes_inv[1]) ;
+						
+						gradient_values_y[3] -= regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * (spins[icell_plus+2*pad] - spins[icell_minus+2*pad]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[1]);
+						gradient_values_z[3] += regions_book[regions[icell_nonpad]].Dmi * regions_book[regions[icell_nonpad]].Ms_inv * (spins[icell_plus+pad] - spins[icell_minus+pad]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[1]);
+					}
+				}
+			}
+		}
+		
+		
+		icell_plus =(regions_book[regions[x+y*WIDTH+zr*WIDTH*HEIGHT]].Ms!=0) ? x+y*WIDTH+3*zr*WIDTH*HEIGHT : icell;
+		icell_plus2 =(regions_book[regions[x+y*WIDTH+zrr*WIDTH*HEIGHT]].Ms!=0) ? x+y*WIDTH+3*zrr*WIDTH*HEIGHT : icell_plus;
+		icell_minus=(regions_book[regions[x+y*WIDTH+zl*WIDTH*HEIGHT]].Ms!=0) ? x+y*WIDTH+3*zl*WIDTH*HEIGHT : icell;
+		icell_minus2=(regions_book[regions[x+y*WIDTH+zll*WIDTH*HEIGHT]].Ms!=0) ? x+y*WIDTH+3*zll*WIDTH*HEIGHT : icell_minus;
+		
+		prefactor= regions_book[regions[icell_nonpad]].Aexch*regions_book[regions[icell_nonpad]].Ms_inv* (regions_book[regions[icell_nonpad]].cell_sizes_inv[2]) * (regions_book[regions[icell_nonpad]].cell_sizes_inv[2])/6;
+		gradient_values_x[2] -= prefactor*(-spins[icell_plus2]+16*spins[icell_plus] - 30 * spins[icell] + 16*spins[icell_minus]-spins[icell_minus2]);
+		gradient_values_y[2] -= prefactor*(-spins[icell_plus2+pad]+16*spins[icell_plus+pad] - 30 * spins[icell+pad] + 16*spins[icell_minus+pad]-spins[icell_minus2+pad]) ;
+		gradient_values_z[2] -= prefactor* (-spins[icell_plus2+2*pad]+16*spins[icell_plus+2*pad] - 30 * spins[icell+2*pad] + 16*spins[icell_minus+2*pad]-spins[icell_minus2+2*pad]) ;
+		
+		
+		//DDI leftovers
+		if (ddi_bool==1){
+			gradient_values_x[4]=-regions_book[regions[icell_nonpad]].DDI*mult*regions_book[regions[icell_nonpad]].Ms*gradient[icell];
+			gradient_values_y[4]=-regions_book[regions[icell_nonpad]].DDI*mult*regions_book[regions[icell_nonpad]].Ms*gradient[icell+pad];
+			gradient_values_z[4]=-regions_book[regions[icell_nonpad]].DDI*mult*regions_book[regions[icell_nonpad]].Ms*gradient[icell+2*pad];
+		}
+		
+	}
+	
+	for (uint i=0; i < num_gradient_components;i++){
+		gradient_total[0]+=gradient_values_x[i];
+		gradient_total[1]+=gradient_values_y[i];
+		gradient_total[2]+=gradient_values_z[i];
+		//reduceEnergy[i]=0;
+	}
+	if (damping==1){
+		gradient[icell]=(gradient_total[0]+regions_book[regions[icell_nonpad]].alpha*(spins[icell+pad]*gradient_total[2]-spins[icell+2*pad]*gradient_total[1]))/(1+regions_book[regions[icell_nonpad]].alpha*regions_book[regions[icell_nonpad]].alpha);
+		gradient[icell+pad]=(gradient_total[1]+regions_book[regions[icell_nonpad]].alpha*(spins[icell+2*pad]*gradient_total[0]-spins[icell]*gradient_total[2]))/(1+regions_book[regions[icell_nonpad]].alpha*regions_book[regions[icell_nonpad]].alpha);
+		gradient[icell+2*pad]=(gradient_total[2]+regions_book[regions[icell_nonpad]].alpha*(spins[icell]*gradient_total[1]-spins[icell+pad]*gradient_total[0]))/(1+regions_book[regions[icell_nonpad]].alpha*regions_book[regions[icell_nonpad]].alpha);
+	}else{
+		gradient[icell]=gradient_total[0];
+		gradient[icell+pad]=gradient_total[1];
+		gradient[icell+2*pad]=gradient_total[2];
+	}
+	for (int i=1; i< num_components_write;i++){
+		gradient[icell+i*3*n]=gradient_values_x[i-1];
+		gradient[icell+pad+i*3*n]=gradient_values_y[i-1];
+		gradient[icell+2*pad+i*3*n]=gradient_values_z[i-1];
+	}
+	if (save_energy==1){
+		float reduceEnergy[num_gradient_components];
+		float mx=0.0;
+		float my=0.0;
+		float mz=0.0;
+		for (uint i=0; i < num_gradient_components;i++){
+			reduceEnergy[i] = gradient_values_x[i]*spins[icell];
+			reduceEnergy[i] += gradient_values_y[i]*spins[icell+pad];
+			reduceEnergy[i] += gradient_values_z[i]*spins[icell+2*pad];
+		}
+		
+		mx = spins[icell];
+		my = spins[icell+pad];
+		mz = spins[icell+2*pad];
+
+		for (uint i=0; i < num_gradient_components;i++){
+			reduceEnergy[i] = subgroupAdd(reduceEnergy[i]);
+		}
+
+		mx = subgroupAdd(mx);
+		my = subgroupAdd(my);
+		mz = subgroupAdd(mz);
+		
+		if (gl_SubgroupInvocationID == 0)
+		{
+			for (uint i=0; i < num_gradient_components;i++){
+				sdata[gl_SubgroupID+i*sumSubGroupSize]=reduceEnergy[i];
+			}
+			sdata[gl_SubgroupID+num_gradient_components*sumSubGroupSize] = mx;
+			sdata[gl_SubgroupID+(num_gradient_components+1)*sumSubGroupSize] = my;
+			sdata[gl_SubgroupID+(num_gradient_components+2)*sumSubGroupSize] = mz;
+		}
+
+		memoryBarrierShared();
+		barrier();
+
+		if (gl_SubgroupID == 0)
+		{
+			for (uint i=0; i < num_gradient_components;i++){
+				reduceEnergy[i] = gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID+i*sumSubGroupSize] : 0;
+				reduceEnergy[i] = subgroupAdd(reduceEnergy[i]);
+			}
+			mx= gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID+num_gradient_components*sumSubGroupSize] : 0;
+			mx = subgroupAdd(mx);
+			
+			my= gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID+(num_gradient_components+1)*sumSubGroupSize] : 0;
+			my = subgroupAdd(my);
+			
+			mz= gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID+(num_gradient_components+2)*sumSubGroupSize] : 0;
+			mz = subgroupAdd(mz);
+		}
+
+		if (gl_LocalInvocationID.x+gl_LocalInvocationID.y*gl_WorkGroupSize.x == 0)
+		{
+			uint work_ID=gl_WorkGroupID.x+gl_WorkGroupID.y*gl_NumWorkGroups.x+gl_WorkGroupID.z*gl_NumWorkGroups.x*gl_NumWorkGroups.y;
+			uint num_WorkGroups=gl_NumWorkGroups.x*gl_NumWorkGroups.y*gl_NumWorkGroups.z;
+			
+			for (uint i=0; i < num_gradient_components;i++){
+				partial_sums[work_ID+i*num_WorkGroups]=reduceEnergy[i];
+			}
+			
+			partial_sums[work_ID+num_gradient_components*num_WorkGroups] = mx;
+			partial_sums[work_ID+(num_gradient_components+1)*num_WorkGroups] = my;
+			partial_sums[work_ID+(num_gradient_components+2)*num_WorkGroups] = mz;
+		}
+	}
+}

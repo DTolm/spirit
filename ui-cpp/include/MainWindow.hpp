@@ -29,6 +29,7 @@ class MainWindow : public QMainWindow, private Ui::MainWindow
 
 public:
     MainWindow(std::shared_ptr<State> state);
+	void control_set_solver(std::string SolverName);
 
 protected:
     void closeEvent(QCloseEvent *event) Q_DECL_OVERRIDE;
@@ -36,7 +37,7 @@ protected:
 private slots:
 	void keyPressEvent(QKeyEvent *ev) override;
 	void keyReleaseEvent(QKeyEvent * ev) override;
-	void takeScreenshot();
+	void takeScreenshot(int iteration=0);
 	void edit_cut();
 	void edit_copy();
 	void edit_paste();
@@ -62,7 +63,7 @@ private slots:
 	void view_toggle_fullscreen();
 	void toggleSpinWidget();
 	void toggleInfoWidget();
-	void view_toggleDragMode();
+	void view_togglePasteMode(SpinWidget::InteractionMode mode);
     void about();
 	void keyBindings();
 	void load_Configuration();
@@ -71,6 +72,8 @@ private slots:
 	void load_Spin_Configuration();
 	void save_Spin_Configuration_Chain();
 	void load_Spin_Configuration_Chain();
+	void save_Spin_Configuration_Eigenmodes();
+	void load_Spin_Configuration_Eigenmodes();
 	void save_System_Energy_Spins();
 	void save_Chain_Energies();
 	void save_Chain_Energies_Interpolated();
@@ -90,6 +93,7 @@ private:
 
 	// State
 	std::shared_ptr<State> state;
+	std::shared_ptr<State> state_copy;
 	// Widgets
 	SpinWidget *spinWidget;
 	InfoWidget *infoWidget;
@@ -142,6 +146,7 @@ private:
 
 	// Screenshot numbering
 	int n_screenshots;
+	int iteration_last=-1000;
 };
 
 #endif

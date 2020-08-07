@@ -1,0 +1,53 @@
+#version 450
+
+layout (local_size_x = 1024, local_size_y = 1,local_size_z = 1) in;
+
+layout(binding = 0) readonly buffer Data0
+{
+   float grad [];
+};
+layout(binding = 1) writeonly buffer Data2
+{
+   float grad_pr [];
+};
+layout(binding = 2) buffer Data3
+{
+   float s [];
+};
+layout(push_constant) uniform PushConsts
+{
+  float grad_mult;
+  uint pad;
+} consts;
+
+
+
+void main() {
+      
+	  grad_pr[gl_GlobalInvocationID.x]=grad[gl_GlobalInvocationID.x];
+	  grad_pr[gl_GlobalInvocationID.x+consts.pad]=grad[gl_GlobalInvocationID.x+consts.pad];
+	  grad_pr[gl_GlobalInvocationID.x+2*consts.pad]=grad[gl_GlobalInvocationID.x+2*consts.pad];
+	  float theta = sqrt(consts.grad_mult*grad[gl_GlobalInvocationID.x]*consts.grad_mult*grad[gl_GlobalInvocationID.x]+consts.grad_mult*grad[gl_GlobalInvocationID.x+consts.pad]*consts.grad_mult*grad[gl_GlobalInvocationID.x+consts.pad]+consts.grad_mult*grad[gl_GlobalInvocationID.x+2*consts.pad]*consts.grad_mult*grad[gl_GlobalInvocationID.x+2*consts.pad]);
+      float theta_inv = 1.0/theta;
+      float q = cos(theta);
+      float w = 1 - q;
+      float x = -consts.grad_mult*grad[gl_GlobalInvocationID.x]* theta_inv;
+      float y = -consts.grad_mult*grad[gl_GlobalInvocationID.x+consts.pad]* theta_inv;
+      float z = -consts.grad_mult*grad[gl_GlobalInvocationID.x+2*consts.pad]* theta_inv;
+      float s1 = -y * z * w;
+      float s2 = x * z * w;
+      float s3 = -x * y * w;
+      float p1 = x * sin(theta);
+      float p2 = y * sin(theta);
+      float p3 = z * sin(theta);
+      float t1, t2, t3;
+      if (theta > 1.0e-20) // if theta is too small we do nothing
+      {
+        t1 = (q + z * z * w) * s[gl_GlobalInvocationID.x] + (s1 + p1) * s[gl_GlobalInvocationID.x+consts.pad] + (s2 + p2) * s[gl_GlobalInvocationID.x+2*consts.pad];
+        t2 = (s1 - p1) * s[gl_GlobalInvocationID.x] + (q + y * y * w) * s[gl_GlobalInvocationID.x+consts.pad] + (s3 + p3) * s[gl_GlobalInvocationID.x+2*consts.pad];
+        t3 = (s2 - p2) * s[gl_GlobalInvocationID.x] + (s3 - p3) * s[gl_GlobalInvocationID.x+consts.pad] + (q + x * x * w) * s[gl_GlobalInvocationID.x+2*consts.pad];
+        s[gl_GlobalInvocationID.x] = t1;
+        s[gl_GlobalInvocationID.x+consts.pad] = t2;
+        s[gl_GlobalInvocationID.x+2*consts.pad] = t3;
+      };
+}	

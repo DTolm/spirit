@@ -1,0 +1,123 @@
+#version 450
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+
+layout (local_size_x_id = 1) in;
+layout (constant_id = 2) const int sumSubGroupSize = 64;
+
+layout(binding = 0) buffer Data0
+{
+   float d_a [];
+};
+layout(binding = 1) buffer Data1
+{
+   float d_g [];
+};
+layout(binding = 2) buffer Data2
+{
+   float sd [];
+};
+layout(binding = 3) buffer Data3
+{
+   float grad [];
+};
+layout(binding = 4) buffer Data4
+{
+   float grad_pr [];
+};
+
+layout(binding = 5) buffer control_variables
+{
+   float control []; // 0-2 rho; 3-5 alpha;
+};
+
+layout(binding = 6) buffer local_iteration
+{
+   uint iteration []; // 
+};
+
+
+layout(std430, binding = 7) writeonly buffer PartialSums
+{
+   float partial_sums[];
+};
+layout(binding = 8) buffer MaxMove
+{
+   float maxmove [];
+};
+
+layout(push_constant) uniform PushConsts
+{
+  uint num_mem;
+  uint nos;
+  uint pad;
+  float eps;
+  uint k;
+  float max_move;
+} consts;
+
+shared float sdata[sumSubGroupSize];
+shared float sdata2[sumSubGroupSize];
+
+void main() {
+	uint i=iteration[gl_WorkGroupID.x]%consts.num_mem;
+	if (iteration[gl_WorkGroupID.x]==0){
+		grad_pr[gl_GlobalInvocationID.x]=grad[gl_GlobalInvocationID.x];
+		sd[gl_GlobalInvocationID.x]=-grad[gl_GlobalInvocationID.x];
+		for (uint j=0;j<consts.num_mem;j++){
+			
+			d_a[gl_GlobalInvocationID.x+j*consts.nos*3]=0;
+			d_g[gl_GlobalInvocationID.x+j*consts.nos*3]=0;
+		}
+		if (gl_LocalInvocationID.x==gl_WorkGroupSize.x-1){
+			for (uint j=0;j<consts.num_mem;j++){
+				
+					control[j+2*consts.num_mem*gl_WorkGroupID.x]=0;//rho
+			}
+		}
+	} else{
+		d_a[gl_GlobalInvocationID.x+i*consts.nos*3]=sd[gl_GlobalInvocationID.x];
+		d_g[gl_GlobalInvocationID.x+i*consts.nos*3]=grad[gl_GlobalInvocationID.x]-grad_pr[gl_GlobalInvocationID.x];
+
+		float dot = 0.0;
+		float dot2 = 0.0;
+		if (gl_GlobalInvocationID.x < consts.nos*3)
+		{
+			dot = d_a[gl_GlobalInvocationID.x+i*consts.nos*3]*d_g[gl_GlobalInvocationID.x+i*consts.nos*3];
+			dot2 = d_a[gl_GlobalInvocationID.x+i*consts.nos*3]*d_a[gl_GlobalInvocationID.x+i*consts.nos*3];
+		}
+		dot = subgroupAdd(dot);
+		dot2 = subgroupAdd(dot2);
+		if (gl_SubgroupInvocationID == 0)
+		{
+			sdata[gl_SubgroupID] = dot;
+			sdata2[gl_SubgroupID] = dot2;
+		}
+
+		memoryBarrierShared();
+		barrier();
+
+		if (gl_SubgroupID == 0)
+		{
+			dot = gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID] : 0;
+			dot = subgroupAdd(dot);
+			
+			dot2 = gl_SubgroupInvocationID < gl_NumSubgroups ? sdata2[gl_SubgroupInvocationID] : 0;
+			dot2 = subgroupAdd(dot2);
+			
+		}
+
+		if (gl_LocalInvocationID.x == 0)
+		{
+			partial_sums[gl_WorkGroupID.x] = dot;
+			partial_sums[gl_WorkGroupID.x+gl_NumWorkGroups.x] = dot2;
+		}
+		
+	}
+
+	if (gl_GlobalInvocationID.x==0)
+	{
+		iteration[gl_NumWorkGroups.x]+=1;
+		if (iteration[gl_NumWorkGroups.x]%200000000==0)
+			maxmove[1] *= 0.5;
+	}
+}

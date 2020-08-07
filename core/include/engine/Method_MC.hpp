@@ -3,7 +3,8 @@
 #define METHOD_MC_H
 
 #include "Spirit_Defines.h"
-#include <engine/Method_Solver.hpp>
+#include <engine/Method.hpp>
+// #include <engine/Method_Solver.hpp>
 #include <data/Spin_System.hpp>
 // #include <data/Parameters_Method_MC.hpp>
 
@@ -48,13 +49,16 @@ namespace Engine
         void Message_End() override;
 
 
-
         std::shared_ptr<Data::Parameters_Method_MC> parameters_mc;
 
         // Cosine of current cone angle
         scalar cone_angle;
         int n_rejected;
         scalar acceptance_ratio_current;
+        int nos_nonvacant;
+
+        // Random vector array
+        vectorfield xi;
     };
 }
 

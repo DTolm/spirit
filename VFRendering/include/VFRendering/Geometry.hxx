@@ -19,7 +19,7 @@ public:
      *  this to be a problem, the directions and vectors would take up at least
      *  96 GiB of GPU memory, so it should be fine for the next years.
      */
-    typedef unsigned int index_type;
+    typedef int index_type;
 
     Geometry();
     Geometry(const std::vector<glm::vec3>& positions, const std::vector<std::array<index_type, 3>>& surface_indices={}, const std::vector<std::array<index_type, 4>>& volume_indices={}, const bool& is_2d=false);

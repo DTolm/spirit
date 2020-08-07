@@ -1,0 +1,66 @@
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+
+#define WORKGROUP_SIZE 32
+
+struct Region{
+  float Ms;
+  float Ms_inv;
+  float minMs;
+  float minMs_inv;
+  float alpha;
+  float Aexch;
+  float Aexch_inv;
+  float Dmi_interface; 
+  float Dmi_bulk; 
+  float DDI;
+  float external_field_magnitude;
+  float external_field_normal[3];
+  int n_anisotropies;
+  float anisotropy_magnitudes[2];
+  float anisotropy_normals[2*3];
+  float Kc1;
+  float anisotropy_cubic_normals[9];
+  float cell_sizes[3];
+  float cell_sizes_inv[3];
+};
+layout (local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = 1 ) in;
+
+layout(binding = 0) uniform UBO {
+    uint WIDTH;
+    uint HEIGHT;
+    uint DEPTH;
+    uint n;
+};
+
+layout(binding = 1) readonly buffer DataIn
+{
+   float datain [];
+};
+
+layout(binding = 2) writeonly buffer DataOut
+{
+   float dataout [];
+};
+layout(binding = 3) readonly buffer Regions_Book
+{
+   Region regions_book[];
+};
+layout(binding = 4) readonly buffer Regions_Buf
+{
+   int regions[];
+};
+void main() {
+    uint id_in=3*(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * WIDTH + gl_GlobalInvocationID.z * WIDTH * HEIGHT );
+	uint id_out=(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * WIDTH + gl_GlobalInvocationID.z * WIDTH * HEIGHT );
+	if (regions_book[regions[gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * WIDTH + gl_GlobalInvocationID.z * WIDTH * HEIGHT]].Ms==0){
+		dataout[id_out]=0;
+		dataout[id_out+n]=0;
+		dataout[id_out+2*n]=0;
+	}else{
+		dataout[id_out]=datain[id_in];
+		dataout[id_out+n]=datain[id_in+1];
+		dataout[id_out+2*n]=datain[id_in+2];
+	}
+
+}

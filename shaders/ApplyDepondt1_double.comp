@@ -1,0 +1,104 @@
+#version 450
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#extension GL_ARB_gpu_shader_fp64 : enable
+
+double sina_11(double x)
+{
+    //minimax coefs for sin for 0..pi/2 range
+    const double a3 = -1.666666660646699151540776973346659104119e-1LF;
+    const double a5 =  8.333330495671426021718370503012583606364e-3LF;
+    const double a7 = -1.984080403919620610590106573736892971297e-4LF;
+    const double a9 =  2.752261885409148183683678902130857814965e-6LF;
+    const double ab = -2.384669400943475552559273983214582409441e-8LF;
+
+    const double m_2_pi = 0.636619772367581343076LF;
+    const double m_pi_2 = 1.57079632679489661923LF;
+
+    double y = abs(x * m_2_pi);
+    double q = floor(y);
+    int quadrant = int(q);
+
+    double t = (quadrant & 1) != 0 ? 1 - y + q : y - q;
+    t *= m_pi_2;
+
+    double t2 = t * t;
+    double r = fma(fma(fma(fma(fma(ab, t2, a9), t2, a7), t2, a5), t2, a3),
+        t2*t, t);
+
+    r = x < 0 ? -r : r;
+
+    return (quadrant & 2) != 0 ? -r : r;
+}
+double cosa_11(double x)
+{
+    //sin(x + PI/2) = cos(x)
+    return sina_11(x + 1.57079632679489661923LF);
+}
+layout (local_size_x_id = 1) in;
+layout (constant_id = 2) const int sumSubGroupSize = 64;
+
+layout(binding = 0) buffer Data0
+{
+   float s [];
+};
+layout(binding = 1) buffer Data1
+{
+   float s_copy [];
+};
+layout(binding = 2) buffer Data2
+{
+   float grad [];
+};
+layout(binding = 3) buffer Data3
+{
+   float grad_copy [];
+};
+layout(binding = 4) buffer Torque
+{
+   float gamma_dt_from_torque [];
+};
+layout(push_constant) uniform PushConsts
+{
+  
+  float dt;
+  uint pad;
+} consts;
+shared float sdata[sumSubGroupSize];
+
+void main() {
+
+	uint id_x=gl_GlobalInvocationID.x;
+	
+	double gamma_dt= (consts.dt==0) ? 1e-4/gamma_dt_from_torque[0] : consts.dt; 
+	s_copy[id_x]=s[id_x];
+	s_copy[id_x+consts.pad]=s[id_x+consts.pad];
+	s_copy[id_x+2*consts.pad]=s[id_x+2*consts.pad];
+	grad_copy[id_x]=grad[id_x];
+	grad_copy[id_x+consts.pad]=grad[id_x+consts.pad];
+	grad_copy[id_x+2*consts.pad]=grad[id_x+2*consts.pad];
+	double grad_norm = sqrt(grad[id_x]*grad[id_x]+grad[id_x+consts.pad]*grad[id_x+consts.pad]+grad[id_x+2*consts.pad]*grad[id_x+2*consts.pad]);
+	if (grad_norm > 1.0e-20) // if q is too small we do nothing
+	{
+		double grad_norm_inv=1.0/grad_norm;
+		double q = cosa_11(grad_norm*gamma_dt);
+		double w = 1 - q;
+		double x = -grad[id_x]* grad_norm_inv;
+		double y = -grad[id_x+consts.pad]* grad_norm_inv;
+		double z = -grad[id_x+2*consts.pad]* grad_norm_inv;
+		double s1 = x * y * w;
+		double s2 = x * z * w;
+		double s3 = z * y * w;
+		double sin_grad= sina_11(grad_norm*gamma_dt);
+		double p1 = z * sin_grad;
+		double p2 = y * sin_grad;
+		double p3 = x * sin_grad;
+		double t1, t2, t3;
+	
+		t1 = (q + x* x * w) * s[id_x] + (s1 - p1) * s[id_x+consts.pad] + (s2 + p2) * s[id_x+2*consts.pad];
+		t2 = (s1 + p1) * s[id_x] + (q + y * y * w) * s[id_x+consts.pad] + (s3 - p3) * s[id_x+2*consts.pad];
+		t3 = (s2 - p2) * s[id_x] + (s3 + p3) * s[id_x+consts.pad] + (q + z * z * w) * s[id_x+2*consts.pad];
+		s[id_x] =  float(t1);
+		s[id_x+consts.pad] = float(t2);
+		s[id_x+2*consts.pad] = float(t3);
+	};
+}

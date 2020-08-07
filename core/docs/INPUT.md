@@ -5,12 +5,12 @@ The following sections will list and explain the input file keywords.
 
 1. [General Settings and Log](#General)
 2. [Geometry](#Geometry)
-2. [Heisenberg Hamiltonian](#Heisenberg)
-2. [Gaussian Hamiltonian](#Gaussian)
-2. [Method Output](#MethodOutput)
-2. [Method Parameters](#MethodParameters)
-2. [Pinning](#Pinning)
-2. [Disorder and Defects](#Defects)
+3. [Heisenberg Hamiltonian](#Heisenberg)
+4. [Gaussian Hamiltonian](#Gaussian)
+5. [Method Output](#MethodOutput)
+6. [Method Parameters](#MethodParameters)
+7. [Pinning](#Pinning)
+8. [Disorder and Defects](#Defects)
 
 
 General Settings and Log <a name="General"></a>
@@ -69,10 +69,16 @@ direction of the basis can be specified.
 ### The bravais lattice type
 bravais_lattice sc
 
+### µSpin
+mu_s 2.0
+
 ### Number of basis cells along principal
 ### directions (a b c)
 n_basis_cells 100 100 10
 ```
+
+If you have a nontrivial basis cell, note that you should specify `mu_s`
+for all atoms in your basis cell (see the next example).
 
 **2D honeycomb example:**
 
@@ -80,6 +86,7 @@ n_basis_cells 100 100 10
 ### The bravais lattice type
 bravais_lattice hex2d
 
+### The basis cell in units of bravais vectors
 ### n            No of spins in the basis cell
 ### 1.x 1.y 1.z  position of spins within basis
 ### 2.x 2.y 2.z  cell in terms of bravais vectors
@@ -87,6 +94,9 @@ basis
 2
 0   0                      0
 0.86602540378443864676 0.5 0
+
+### µSpin
+mu_s 2.0 1.0
 
 ### Number of basis cells along principal
 ### directions (a b c)
@@ -130,6 +140,17 @@ A lattice constant can be used for scaling:
 ### Scaling constant
 lattice_constant 1.0
 ```
+Note that it scales the Bravais vectors and therefore the
+translations, atom positions in the basis cell and potentially
+-- if you specified them in terms of the Bravais vectors --
+also the anisotropy and DM vectors.
+
+**Units:**
+
+The Bravais vectors (or matrix) are specified in Cartesian coordinates in units of Angstrom.
+The basis atoms are specified in units of the Bravais vectors.
+
+The atomic moments `mu_s` are specified in units of the Bohr magneton `mu_B`.
 
 
 Heisenberg Hamiltonian <a name="Heisenberg"></a>
@@ -144,24 +165,27 @@ as input parameter after the `hamiltonian` keyword.
 ### Hamiltonian Type (heisenberg_neighbours, heisenberg_pairs, gaussian)
 hamiltonian              heisenberg_neighbours
 
-### boundary_conditions (in a b c) = 0(open), 1(periodical)
+### Boundary conditions (in a b c) = 0(open), 1(periodical)
 boundary_conditions      1 1 0
 
-### external magnetic field vector[T]
+### External magnetic field [T]
 external_field_magnitude 25.0
 external_field_normal    0.0 0.0 1.0
-### µSpin
-mu_s                     2.0
 
 ### Uniaxial anisotropy constant [meV]
 anisotropy_magnitude     0.0
 anisotropy_normal        0.0 0.0 1.0
 
-### Dipole-Dipole radius
-dd_radius          0.0
-```
+### Dipole-dipole interaction caclulation method
+### (none, fft, fmm, cutoff)
+ddi_method               fft
 
-If you have a nontrivial basis cell, note that you should specify `mu_s` for all atoms in your basis cell.
+### DDI number of periodic images (fft and fmm) in (a b c)
+ddi_n_periodic_images    4 4 4
+
+### DDI cutoff radius (if cutoff is used)
+ddi_radius               0.0
+```
 
 *Anisotropy:*
 By specifying a number of anisotropy axes via `n_anisotropy`, one
@@ -169,6 +193,20 @@ or more anisotropy axes can be set for the atoms in the basis cell. Specify colu
 via headers: an index `i` and an axis `Kx Ky Kz` or `Ka Kb Kc`, as well as optionally
 a magnitude `K`.
 
+*Dipole-Dipole Interaction:*
+Via the keyword `ddi_method` the method employed to calculate the dipole-dipole interactions is specified.
+
+      `none`   -  Dipole-Dipole interactions are neglected
+      `fft`    -  Uses a fast convolution method to accelerate the calculation
+      `cutoff` -  Lets only spins within a maximal distance of 'ddi_radius' interact
+      `fmm`    -  Uses the Fast-Multipole-Method (NOT YET IMPLEMENTED!)
+
+If the `cutoff`-method has been chosen the cutoff-radius can be specified via `ddi_radius`.
+*Note:* If `ddi_radius` < 0 a direct summation (i.e. brute force) over the whole system is performed. This is very inefficient and only encouraged for very small systems and/or unit-testing/debugging.
+
+If the boundary conditions are periodic `ddi_n_periodic_images` specifies how many images are taken in the respective direction.
+*Note:* The images are appended on both sides (the edges get filled too)
+i.e. 1 0 0 -> one image in +a direction and one image in -a direction
 
 **Neighbour shells**:
 
@@ -177,7 +215,7 @@ Using `hamiltonian heisenberg_neighbours`, pair-wise interactions are handled in
 
 ```Python
 ### Hamiltonian Type (heisenberg_neighbours, heisenberg_pairs, gaussian)
-hamiltonian              heisenberg_neighbours
+hamiltonian       heisenberg_neighbours
 
 ### Exchange: number of shells and constants [meV / unique pair]
 n_shells_exchange 2
@@ -193,7 +231,6 @@ dij	              6.0 0.5
 Note that pair-wise interaction parameters always mean energy per unique pair
 (not per neighbour).
 
-
 **Specify Pairs**:
 
 Using `hamiltonian heisenberg_pairs`, you may input interactions explicitly,
@@ -202,7 +239,7 @@ the ability to specify non-isotropic interactions:
 
 ```Python
 ### Hamiltonian Type (heisenberg_neighbours, heisenberg_pairs, gaussian)
-hamiltonian                 heisenberg_pairs
+hamiltonian       heisenberg_pairs
 
 ### Pairs
 n_interaction_pairs 3
@@ -240,11 +277,17 @@ respectively.
 
 ```Python
 ### Pairs
-interaction_pairs_file        input/pairs.txt
+interaction_pairs_file       input/pairs.txt
 
 ### Quadruplets
-interaction_quadruplets_file  input/quadruplets.txt
+interaction_quadruplets_file input/quadruplets.txt
 ```
+
+**Units:**
+
+The external field is specified in Tesla, while anisotropy is specified in meV.
+Pairwise interactions are specified in meV per unique pair,
+while quadruplets are specified in meV per unique quadruplet.
 
 
 Gaussian Hamiltonian <a name="Gaussian"></a>
@@ -274,6 +317,7 @@ gaussians
 
 Method Output <a name="MethodOutput"></a>
 --------------------------------------------------
+
 For `llg` and equivalently `mc` and `gneb`, you can specify which
 output you want your simulations to create. They share a few common
 output types, for example:
@@ -287,6 +331,9 @@ llg_output_final   1    # Save after the last iteration
 Note in the following that `step` means after each `N` iterations and
 denotes a separate file for each step, whereas `archive` denotes that
 results are appended to an archive file at each step.
+
+The energy output files are in units of meV, and can be switched to
+meV per spin with `<method>_output_energy_divide_by_nspins`.
 
 **LLG**:
 ```Python
@@ -322,6 +369,7 @@ gneb_output_chain_step 0    # Save the whole chain at each step
 
 Method Parameters <a name="MethodParameters"></a>
 --------------------------------------------------
+
 Again, the different Methods share a few common parameters.
 On the example of the LLG Method:
 
@@ -340,6 +388,7 @@ llg_n_iterations_log    2000
 ```
 
 **LLG**:
+
 ```Python
 ### Seed for Random Number Generator
 llg_seed            20006
@@ -347,7 +396,7 @@ llg_seed            20006
 ### Damping [none]
 llg_damping         0.3E+0
 
-### Time step dt
+### Time step dt [ps]
 llg_dt              1.0E-3
 
 ### Temperature [K]
@@ -356,12 +405,16 @@ llg_temperature_gradient_direction   1 0 0
 llg_temperature_gradient_inclination 0.0
 
 ### Spin transfer torque parameter proportional to injected current density
-llg_stt_magnitude  0.0
+llg_stt_magnitude   0.0
 ### Spin current polarisation normal vector
 llg_stt_polarisation_normal	1.0 0.0 0.0
 ```
 
+The time step `dt` is given in picoseconds.
+The temperature is given in Kelvin and the temperature gradient in Kelvin/Angstrom.
+
 **MC**:
+
 ```Python
 ### Seed for Random Number Generator
 mc_seed	            20006
@@ -374,6 +427,7 @@ mc_acceptance_ratio 0.5
 ```
 
 **GNEB**:
+
 ```Python
 ### Constant for the spring force
 gneb_spring_constant 1.0
@@ -385,6 +439,7 @@ gneb_n_energy_interpolations 10
 
 Pinning <a name="Pinning"></a>
 --------------------------------------------------
+
 Note that for this feature you need to build with `SPIRIT_ENABLE_PINNING`
 set to `ON` in cmake.
 
@@ -409,12 +464,12 @@ pinning_cell
 To specify individual pinned sites (overriding the above pinning settings),
 insert a list into your input. For example:
 ```Python
-### Specify the number of pinned sites and then the directions
-### ispin S_x S_y S_z
+### Specify the number of pinned sites and then the sites (in terms of translations) and directions
+### i  da db dc  Sx Sy Sz
 n_pinned 3
-0 1.0 0.0 0.0
-1 0.0 1.0 0.0
-2 0.0 0.0 1.0
+0  0 0 0  1.0 0.0 0.0
+0  1 0 0  0.0 1.0 0.0
+0  0 1 0  0.0 0.0 1.0
 ```
 You may also place it into a separate file with the keyword `pinned_from_file`,
 e.g.
@@ -428,28 +483,45 @@ inside the file.
 
 Disorder and Defects <a name="Defects"></a>
 --------------------------------------------------
+
 Note that for this feature you need to build with `SPIRIT_ENABLE_DEFECTS`
 set to `ON` in cmake.
 
-Disorder is not yet implemented.
-<!--Disorder is not yet implemented but you will specify the basis in the form
+In order to specify disorder across the lattice, you can write for example a
+single atom basis with 50% chance of containing one of two atom types (0 or 1):
 ```Python
-disorder 1
-0  0.5
-1  0.25
-2  0.25
-```-->
+# iatom  atom_type  mu_s  concentration
+atom_types 1
+    0        1       2.0     0.5
+```
+
+Note that you have to also specify the magnetic moment, as this is now site-
+and atom type dependent.
+
+A two-atom basis where
+- the first atom is type 0
+- the second atom is 70% type 1 and 30% type 2
+```Python
+# iatom  atom_type  mu_s  concentration
+atom_types 2
+    0        0       1.0      1
+    1        1       2.5     0.7
+    1        2       2.3     0.3
+```
+
+The total concentration on a site should not be more than `1`. If it is less
+than `1`, vacancies will appear.
 
 To specify defects, be it vacancies or impurities, you may fix atom types for
 sites of the whole lattice by inserting a list into your input. For example:
 ```Python
 ### Atom types: type index 0..n or or vacancy (type < 0)
-### Specify the number of defects and then the defects
-### ispin itype
+### Specify the number of defects and then the defects in terms of translations and type
+### i  da db dc  itype
 n_defects 3
-0 -1
-1 -1
-2 -1
+0  0 0 0  -1
+0  1 0 0  -1
+0  0 1 0  -1
 ```
 You may also place it into a separate file with the keyword `defects_from_file`,
 e.g.

@@ -1,0 +1,16 @@
+#version 450
+
+layout (local_size_x = 1024, local_size_y = 1,local_size_z = 1) in;
+
+layout(binding = 0) readonly buffer Data
+{
+   float grad_g_cur [];
+};
+layout(binding = 1) writeonly buffer Data2
+{
+   float dir_searchdir [];
+};
+
+void main() {
+    dir_searchdir[gl_GlobalInvocationID.x]=-  grad_g_cur[gl_GlobalInvocationID.x];
+}

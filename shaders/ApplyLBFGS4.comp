@@ -1,0 +1,64 @@
+#version 450
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+
+layout (local_size_x_id = 1) in;
+layout (constant_id = 2) const int sumSubGroupSize = 64;
+
+layout(binding = 0) readonly buffer Data0
+{
+   float d_g [];
+};
+layout(binding = 1) writeonly buffer Data2
+{
+   float sd [];
+};
+layout(binding = 2) buffer Data1
+{
+   float q_vec [];
+};
+
+layout(binding = 3) buffer control_variables
+{
+   float control []; // 1-3 rho;4-6 alpha
+};
+layout(binding = 4) buffer local_iteration
+{
+   uint iteration []; // 
+};
+layout(binding = 5) readonly buffer Data3
+{
+   float reduceResults[];
+};
+layout(push_constant) uniform PushConsts
+{
+  uint num_mem;
+  uint nos;
+  uint pad;
+  float eps;
+  uint k;
+  float max_move;
+} consts;
+
+
+
+void main() {
+	if (iteration[gl_WorkGroupID.x]!=0){
+		uint i=iteration[gl_WorkGroupID.x]%consts.num_mem;
+		uint c=(consts.k+i+1)%consts.num_mem;
+		q_vec[gl_GlobalInvocationID.x]-=d_g[gl_GlobalInvocationID.x +c*consts.nos*3]*control[c+2*consts.num_mem*gl_WorkGroupID.x]*reduceResults[0];
+		if (consts.k==0){
+			float rhody2 = reduceResults[1]*control[i];
+			float inv_rhody2;
+			if (rhody2 > consts.eps)
+				inv_rhody2 = 1.0 / rhody2;
+			else
+				inv_rhody2 = 1.0 / (consts.eps);
+			sd[gl_GlobalInvocationID.x]=inv_rhody2*q_vec[gl_GlobalInvocationID.x];
+		}
+		if (gl_LocalInvocationID.x==gl_WorkGroupSize.x-1)
+		{
+			control[c+consts.num_mem+2*consts.num_mem*gl_WorkGroupID.x]=control[c+2*consts.num_mem*gl_WorkGroupID.x]*reduceResults[0];
+		}
+		
+	}
+}
