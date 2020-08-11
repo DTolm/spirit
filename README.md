@@ -2,10 +2,14 @@ SPIRIT
 =============================
 **SPIN SIMULATION FRAMEWORK**<br />
 This repository contains experimental micromagnetic version of Vulkan Spirit developed by Tolmachev Dmitrii.
+Peter Grünberg Institute and Institute for Advanced Simulation, Forschungszentrum Jülich, D-52425 Jülich, Germany
 
 Vulkan Spirit requires installation of Vulkan SDK (https://vulkan.lunarg.com/) with a minimal version of 1.1. It can be launched on any modern GPU - including Nvidia, AMD and Intel iGPU. By utilizing the Vulkan-optimized library VkFFT (https://github.com/DTolm/VkFFT), also developed by Tolmachev Dmitrii, Vulkan Spirit achieves 2x-3x computational speed increase over mumax3 package. More information on implementation and optimizations can be found in my Master thesis, for which contact me by email (d.tolmachev@fz-juelich.de, dtolm96@gmail.com).
 
 This section will be restructured later.
+
+Performance benchmark:
+![alt text](https://github.com/dtolm/Spirit/blob/master/mumax_comparison.png?raw=true)
 
 ![Logo](https://imgur.com/iWc1kuE.png "Spirit Logo")
 
