@@ -53,19 +53,7 @@ void Method_Solver<Solver::RungeKutta4>::Iteration ()
         int k = 0;
         if (allow_copy == true) {
             allow_copy = false;
-            /*for (int i = 1; i < this->systems[0]->geometry->n_cells[0] - 1; i++) {
-                int idx = i + this->systems[0]->geometry->n_cells[0] * this->systems[0]->geometry->n_cells[1] / 2 + this->systems[0]->geometry->n_cells[0] * this->systems[0]->geometry->n_cells[1] * this->systems[0]->geometry->n_cells[2] / 2;
-                scalar* temp = (scalar*)((*this->configurations[0]).data());
-                if ((abs(temp[3 * idx + 2]) < abs(temp[3 * idx - 3 + 2])) && (abs(temp[3 * idx + 2]) < abs(temp[3 * idx + 3 + 2])))
-                {
-                    hopf_radii[k] = i;
-                    k++;
-                }
-            }
-            std::cout << "hopfion coordinates: ";
-            for (int i = 0; i < k; i++)
-                std::cout << hopf_radii[i] << " ";
-            std::cout << "\n";*/
+
             this->systems[0]->app.writeSpins((scalar*)((*this->configurations[0]).data()), &allow_copy);
 
         }

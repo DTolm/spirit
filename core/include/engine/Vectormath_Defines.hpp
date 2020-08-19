@@ -114,7 +114,8 @@ using Vector2 = Eigen::Matrix<scalar, 2, 1>;
         scalar anisotropy_cubic_normals[9];
         Vector3 cell_sizes;
         Vector3 cell_sizes_inv;
-
+        Vector3 periodic;
+        scalar frozen_spins;
 	};
     // Definition for OpenMP reduction operation using Vector3's
     #pragma omp declare reduction (+: Vector3: omp_out=omp_out+omp_in)\

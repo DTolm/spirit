@@ -1472,37 +1472,8 @@ namespace IO
         try
         {
             IO::Filter_File_Handle myfile(configFile);
-            try
-            {
-                IO::Filter_File_Handle myfile(configFile);
-
-                // Boundary conditions
-                myfile.Read_3Vector(boundary_conditions_i, "boundary_conditions");
-                boundary_conditions[0] = (boundary_conditions_i[0] != 0);
-                boundary_conditions[1] = (boundary_conditions_i[1] != 0);
-                boundary_conditions[2] = (boundary_conditions_i[2] != 0);
-
-                if (boundary_conditions_i[0] == 0 )
-                    launchConfiguration.performZeropadding[0] = true;
-                else
-                    launchConfiguration.performZeropadding[0] = false;
-
-                if (boundary_conditions_i[1] == 0)
-                    launchConfiguration.performZeropadding[1] = true;
-                else
-                    launchConfiguration.performZeropadding[1] = false;
-
-                if (boundary_conditions_i[2] == 0 )
-                    launchConfiguration.performZeropadding[2] = true;
-                else
-                    launchConfiguration.performZeropadding[2] = false;
-            }
-            catch( ... )
-            {
-                spirit_handle_exception_core(fmt::format("Unable to read boundary conditions from config file \"{}\"", configFile));
-
-            }
-            
+          
+            myfile.Read_Single(launchConfiguration.GPU_ID, "GPU_ID");
             myfile.Read_Single(launchConfiguration.savePeriod, "save_period");
             myfile.Read_Single(launchConfiguration.groupedIterations, "grouped_iterations");
             std::string double_precision_rotate;
@@ -1533,6 +1504,34 @@ namespace IO
             
             regions_book = regionbook(region_num);
 
+            // Boundary conditions
+            myfile.Read_3Vector(boundary_conditions_i, "boundary_conditions");
+            boundary_conditions[0] = (boundary_conditions_i[0] != 0);
+            boundary_conditions[1] = (boundary_conditions_i[1] != 0);
+            boundary_conditions[2] = (boundary_conditions_i[2] != 0);
+
+            if (boundary_conditions_i[0] == 0)
+                launchConfiguration.performZeropadding[0] = true;
+            else
+                launchConfiguration.performZeropadding[0] = false;
+
+            if (boundary_conditions_i[1] == 0)
+                launchConfiguration.performZeropadding[1] = true;
+            else
+                launchConfiguration.performZeropadding[1] = false;
+
+            if (boundary_conditions_i[2] == 0)
+                launchConfiguration.performZeropadding[2] = true;
+            else
+                launchConfiguration.performZeropadding[2] = false;
+
+            for (int i = 0; i < region_num; i++)
+            {
+                regions_book[i].periodic[0] = (launchConfiguration.performZeropadding[0]) ? 0 : 1;
+                regions_book[i].periodic[1] = (launchConfiguration.performZeropadding[1]) ? 0 : 1;
+                regions_book[i].periodic[2] = (launchConfiguration.performZeropadding[2]) ? 0 : 1;
+                
+            }
             if (myfile.Find("cell_sizes"))
             {
                 myfile.iss >> cell_sizes[0] >> cell_sizes[1] >> cell_sizes[2];
@@ -1572,6 +1571,20 @@ namespace IO
             }
             else {
                 launchConfiguration.damping = false;
+            }
+            if (myfile.Find("frozen_spins"))
+            {
+                for (int i = 0; i < region_num; i++)
+                {
+                    myfile.GetLine();
+                    myfile.iss >> regions_book[i].frozen_spins;
+                }
+            }
+            else {
+                for (int i = 0; i < region_num; i++)
+                {
+                    regions_book[i].frozen_spins=0;
+                }
             }
             // Precision of the spatial gradient calculation
             myfile.Read_Single(spatial_gradient_order, "spatial_gradient_order");

@@ -23,6 +23,8 @@ struct Region{
   float anisotropy_cubic_normals[9];
   float cell_sizes[3];
   float cell_sizes_inv[3];
+  float periodic[3];
+  float frozen_spins;
 };
 layout (local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = 1 ) in;
 

@@ -35,6 +35,8 @@ struct Region{
   float anisotropy_cubic_normals[9];
   float cell_sizes[3];
   float cell_sizes_inv[3];
+  float periodic[3];
+  float frozen_spins;
 };
 
 layout(binding = 0) readonly buffer Spins_Buf
@@ -78,31 +80,37 @@ void main() {
 	//if(gl_GlobalInvocationID.x >= WIDTH || gl_GlobalInvocationID.y >= HEIGHT || gl_GlobalInvocationID.z >= DEPTH)
 	//  return;
 	uint pad= n;
+	
 	uint x = gl_GlobalInvocationID.x;
-	uint xl = (x==0) ? x : x-1;
-	uint xll = (x==1) ? xl : x-2;
-	xll = (x==0) ? x : xll;
-	uint xr = (x==WIDTH-1) ? x : x+1;
-	uint xrr = (x==WIDTH-2) ? xr : x+2;
-	xrr = (x==WIDTH-1) ? x : xrr;
-	
 	uint y = gl_GlobalInvocationID.y;
-	uint yl = (y==0) ? y : y-1;
-	uint yll = (y==1) ? yl : y-2;
-	yll = (y==0) ? y : yll;
-	uint yr = (y==HEIGHT-1) ? y : y+1;
-	uint yrr = (y==HEIGHT-2) ? yr : y+2;
-	yrr = (y==HEIGHT-1) ? y : yrr;
-	
 	uint z = gl_GlobalInvocationID.z;
-	uint zl = (z==0) ? z : z-1;
-	uint zll = (z==1) ? zl : z-2;
-	zll = (z==0) ? z : zll;
-	uint zr = (z==DEPTH-1) ? z : z+1;
-	uint zrr = (z==DEPTH-2) ? zr : z+2;
-	zrr = (z==DEPTH-1) ? z : zrr;
-	
 	uint icell=x+y*WIDTH+z*WIDTH*HEIGHT;
+	uint xl, xr;
+	if (regions_book[regions[icell]].periodic[0]==0){
+		xl = (x==0) ? x : x-1;
+		xr = (x==WIDTH-1) ? x : x+1;
+	}else{
+		xl = (x==0) ? WIDTH-1 : x-1;
+		xr = (x==WIDTH-1) ? 0 : x+1;
+	}
+
+	uint yl, yr;
+	if (regions_book[regions[icell]].periodic[1]==0){
+		yl = (y==0) ? y : y-1;
+		yr = (y==HEIGHT-1) ? y : y+1;
+	}else{
+		yl = (y==0) ? HEIGHT-1 : y-1;
+		yr = (y==HEIGHT-1) ? 0 : y+1;
+	}
+
+	uint zl, zr;
+	if (regions_book[regions[icell]].periodic[2]==0){
+		zl = (z==0) ? z : z-1;
+		zr = (z==DEPTH-1) ? z : z+1;
+	}else{
+		zl = (z==0) ? DEPTH-1 : z-1;
+		zr = (z==DEPTH-1) ? 0 : z+1;
+	}
 	
 	float gradient_values_x[num_gradient_components];
 	float gradient_values_y[num_gradient_components];
@@ -118,7 +126,7 @@ void main() {
 	spins_0[1]=spins[icell+pad];
 	spins_0[2]=spins[icell+2*pad];
 	
-	if (regions_book[regions[icell]].Ms!=0)
+	if ((regions_book[regions[icell]].Ms!=0) && (regions_book[regions[icell]].frozen_spins==0))
 	{
 		//return;
 		//Zeeman

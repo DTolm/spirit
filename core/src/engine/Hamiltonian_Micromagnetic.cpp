@@ -9,7 +9,6 @@
 #include <complex>
 #include <Eigen/Dense>
 #include <Eigen/Core>
-#include "FFT.hpp"
 #include <cstdio>
 #include <utility/Custom_Field.hpp>
 #include "VulkanInitializers.hpp"
@@ -595,7 +594,7 @@ namespace Engine
 
 	void Hamiltonian_Micromagnetic::Gradient_DDI_FFT(const vectorfield & spins, vectorfield & gradient)
 	{
-		#pragma omp parallel for
+		/*#pragma omp parallel for
 		for( int icell = 0; icell < geometry->n_cells_total; ++icell )
 		{
 			mult_spins[icell]=spins[icell]*regions_book[regions[icell]].Ms/ regions_book[regions[icell]].minMs;
@@ -614,12 +613,7 @@ namespace Engine
 		int Na = geometry->n_cells[0];
 		int Nb = geometry->n_cells[1];
 		int Nc = geometry->n_cells[2];
-		/*#endif
-		#ifdef SPIRIT_LOW_MEMORY
-			CU_Mult_Spins << <(geometry->nos + 1023) / 1024, 1024 >> > (minMs, geometry->n_cells_total, regions_book.data(),regions.data(),spins.data(), spins.data());
-			CU_CHECK_AND_SYNC();
-			FFT_Spins(spins);
-		#endif*/
+
 		//FFT_Spins(spins);
 
 		// TODO: also parallelize over i_b1
@@ -717,10 +711,7 @@ namespace Engine
 			//std::cout << i << " " << gradient[16 + i * 64][0] << " " << gradient[16 + i * 64][1] << " " << gradient[16 + i * 64][2] << " fftw\n";
 		//}
 		
-		/*#ifdef SPIRIT_LOW_MEMORY
-			CU_Div_Spins << <(geometry->nos + 1023) / 1024, 1024 >> > (minMs, geometry->n_cells_total, regions_book.data(),regions.data(),spins.data(),spins.data());
-			CU_CHECK_AND_SYNC();
-		#endif*/
+*/
 	}//end Field_DipoleDipole
 
 	void Hamiltonian_Micromagnetic::Gradient_DDI_Direct(const vectorfield & spins, vectorfield & gradient)
@@ -806,7 +797,7 @@ namespace Engine
 
 	void Hamiltonian_Micromagnetic::FFT_Spins(const vectorfield & spins)
 	{
-		int nos = it_bounds_write_spins[0] * it_bounds_write_spins[1] * it_bounds_write_spins[2] * it_bounds_write_spins[3];
+		/*int nos = it_bounds_write_spins[0] * it_bounds_write_spins[1] * it_bounds_write_spins[2] * it_bounds_write_spins[3];
 		int tupel[4];
 		int idx_pad;
 		#pragma omp parallel for
@@ -819,80 +810,9 @@ namespace Engine
 			fft_plan_spins.real_ptr[idx_pad + 2 * spin_stride.comp] = spins[idx_orig][2];
 			//printf("%f %f\n",fft_spin_inputs[this->idx_pad], fft_spin_inputs[this->idx_pad+30]);
 		}
-		FFT::batch_Four_3D(fft_plan_spins);
+		FFT::batch_Four_3D(fft_plan_spins);*/
 	}
 
-	void Hamiltonian_Micromagnetic::FFT_Dipole_Matrices(FFT::FFT_Plan & fft_plan_dipole, int img_a, int img_b, int img_c)
-	{
-		auto& fft_dipole_inputs = fft_plan_dipole.real_ptr;
-
-		field<int> img = {
-							img_a,
-							img_b,
-							img_c
-		};
-
-		// Work around to make bravais vectors and cell_atoms available to GPU as they are currently saves as std::vectors and not fields ...
-		auto translation_vectors = field<Vector3>();
-		auto cell_atom_translations = field<Vector3>();
-
-		for (int i = 0; i < 3; i++)
-			translation_vectors.push_back(geometry->lattice_constant * geometry->bravais_vectors[i]);
-
-		for (int i = 0; i < geometry->n_cell_atoms; i++)
-			cell_atom_translations.push_back(geometry->positions[i]);
-
-		int tupel[3];
-		int sublattice_size = it_bounds_write_dipole[0] * it_bounds_write_dipole[1] * it_bounds_write_dipole[2];
-		//prefactor of ddi interaction
-		//scalar mult = 2.0133545*1e-28 * 0.057883817555 * 0.057883817555 / (4 * 3.141592653589793238462643383279502884197169399375105820974 * 1e-30);
-		//scalar mult = 1 / (4 * 3.141592653589793238462643383279502884197169399375105820974);
-		scalar mult = 1;
-		//#pragma omp parallel for
-		for( int idx0 = 0; idx0 < sublattice_size; ++idx0 )
-		{
-			tupel_from_idx_2(idx0, tupel, it_bounds_write_dipole.data(), 3); // tupel now is {a, b, c}
-			auto& a = tupel[0];
-			auto& b = tupel[1];
-			auto& c = tupel[2];
-			//std::cout<<a<<" "<<b <<" "<<c<<"\n";
-			/*if ((a>198)||(b>198)||(c>198)){
-				printf("%d %d %d\n", a,b,c);
-			}*/
-			/*int a_idx = a < n_cells[0] ? a : a - iteration_bounds[0];
-			int b_idx = b < n_cells[1] ? b : b - iteration_bounds[1];
-			int c_idx = c < n_cells[2] ? c : c - iteration_bounds[2];*/
-			/*int a_idx = a +1 - (int)iteration_bounds[0]/2;
-			int b_idx = b +1- (int)iteration_bounds[1]/2;
-			int c_idx = c +1- (int)iteration_bounds[2]/2;*/
-			int a_idx = a < geometry->n_cells[0] ? a : a - it_bounds_write_dipole[0];
-			int b_idx = b < geometry->n_cells[1] ? b : b - it_bounds_write_dipole[1];
-			int c_idx = c < geometry->n_cells[2] ? c : c - it_bounds_write_dipole[2];
-
-			int idx = a * dipole_stride.a + b * dipole_stride.b + c * dipole_stride.c;
-			//std::cout<<it_bounds_write_dipole[0]<<"\n";
-			for (int i = 0; i < 2; i++) {
-				for (int j = 0; j < 2; j++) {
-					for (int k = 0; k < 2; k++) {
-						double r = sqrt((a_idx + i - 0.5f)*(a_idx + i - 0.5f)*cell_sizes[0]* cell_sizes[0] + (b_idx + j - 0.5f)*(b_idx + j-0.5f)*cell_sizes[1] * cell_sizes[1] + (c_idx + k - 0.5f)*(c_idx + k - 0.5f)*cell_sizes[2] * cell_sizes[2]);
-						fft_dipole_inputs[idx] += mult * pow(-1.0f, i + j + k) * atan(((c_idx + k-0.5f) * (b_idx + j - 0.5f) * cell_sizes[1]*cell_sizes[2]/cell_sizes[0] / r / (a_idx + i - 0.5f)));
-						//fft_dipole_inputs[idx + 1 * dipole_stride.comp] += -mult * pow(-1.0f, i + j + k) * log(abs(((c_idx + k - 0.5f)* cell_sizes[2] + r)/((c_idx + k - 0.5f)* cell_sizes[2] - r)));
-						//fft_dipole_inputs[idx + 2 * dipole_stride.comp] += -mult * pow(-1.0f, i + j + k) * log(abs(((b_idx + j - 0.5f)* cell_sizes[1] + r)/((b_idx + j - 0.5f)* cell_sizes[1] - r)));
-						fft_dipole_inputs[idx + 1 * dipole_stride.comp] -= mult * pow(-1.0f, i + j + k) * log((((c_idx + k - 0.5f)* cell_sizes[2] + r)));
-						fft_dipole_inputs[idx + 2 * dipole_stride.comp] -= mult * pow(-1.0f, i + j + k) * log((((b_idx + j - 0.5f)* cell_sizes[1] + r)));
-
-						fft_dipole_inputs[idx + 3 * dipole_stride.comp] += mult * pow(-1.0f, i + j + k) * atan(((a_idx + i-0.5f) * (c_idx + k - 0.5f) * cell_sizes[2]*cell_sizes[0]/cell_sizes[1] / r / (b_idx + j - 0.5f)));
-						//fft_dipole_inputs[idx + 4 * dipole_stride.comp] += -mult * pow(-1.0f, i + j + k) * log(abs(((a_idx + i - 0.5f)* cell_sizes[0] + r)/((a_idx + i - 0.5f)* cell_sizes[0] - r)));
-						fft_dipole_inputs[idx + 4 * dipole_stride.comp] -= mult * pow(-1.0f, i + j + k) * log((((a_idx + i - 0.5f)* cell_sizes[0] + r)));
-						fft_dipole_inputs[idx + 5 * dipole_stride.comp] += mult * pow(-1.0f, i + j + k) * atan(((b_idx + j-0.5f) * (a_idx + i - 0.5f) * cell_sizes[0]*cell_sizes[1]/cell_sizes[2] / r / (c_idx + k - 0.5f)));
-
-					}
-				}
-			}
-				//if (fft_dipole_inputs[this->idx]<-0.03)
-		}
-		FFT::batch_Four_3D(fft_plan_dipole);
-	}
 	void Hamiltonian_Micromagnetic::Prepare_DDI_vulkan(VulkanCompute::ComputeApplication* app)
 	{
 		mult_spins = vectorfield(geometry->nos, Vector3{ 0,0,1 });
@@ -905,9 +825,9 @@ namespace Engine
 			regions_book[i].minMs_inv = 1 / minMs;
 		}
 		n_cells_padded.resize(3);
-		n_cells_padded[0] = (geometry->n_cells[0] > 1) ? 2 * geometry->n_cells[0] : 1;
-		n_cells_padded[1] = (geometry->n_cells[1] > 1) ? 2 * geometry->n_cells[1] : 1;
-		n_cells_padded[2] = (geometry->n_cells[2] > 1) ? 2 * geometry->n_cells[2] : 1;
+		n_cells_padded[0] = ((geometry->n_cells[0] > 1)&&(launchConfiguration.performZeropadding[0])) ? 2 * geometry->n_cells[0] : geometry->n_cells[0];
+		n_cells_padded[1] = ((geometry->n_cells[1] > 1) && (launchConfiguration.performZeropadding[1])) ? 2 * geometry->n_cells[1] : geometry->n_cells[1];
+		n_cells_padded[2] = ((geometry->n_cells[2] > 1) && (launchConfiguration.performZeropadding[2])) ? 2 * geometry->n_cells[2] : geometry->n_cells[2];
 
 		sublattice_size = n_cells_padded[0] * n_cells_padded[1] * n_cells_padded[2];
 		//printf("111 %d %d %d\n", n_cells_padded[0],n_cells_padded[1],n_cells_padded[2]);
@@ -984,6 +904,7 @@ namespace Engine
 		int range_max[3] = { (it_bounds_write_dipole[0] - 1) / 2 , (it_bounds_write_dipole[1] - 1) / 2 , (it_bounds_write_dipole[2] - 1) / 2 };
 		//std::cout << range_min[0] << " " << range_min[1] << " " << range_min[2] << "\n";
 		//std::cout << range_max[0] << " " << range_max[1] << " " << range_max[2] << "\n";
+		//mumax3 kernel as I don't have anything better at this moment
 		for (int s = 0; s < 3; ++s) {
 			int u = s;
 			int v = (s + 1) % 3;
@@ -1202,8 +1123,8 @@ namespace Engine
 	}
 	void Hamiltonian_Micromagnetic::Clean_DDI()
 	{
-		fft_plan_spins = FFT::FFT_Plan();
-		fft_plan_reverse = FFT::FFT_Plan();
+		/*fft_plan_spins = FFT::FFT_Plan();
+		fft_plan_reverse = FFT::FFT_Plan();*/
 	}
 
     void Hamiltonian_Micromagnetic::Hessian(const vectorfield & spins, MatrixX & hessian)

@@ -25,7 +25,7 @@ const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation"
 };
 
-#ifdef NDEBUG
+#ifndef NDEBUG
     const bool enableValidationLayers = false;
 #else
     const bool enableValidationLayers = true;
@@ -47,11 +47,12 @@ namespace VulkanCompute
 		bool LBFGS_linesearch = false;
 		int solver_type=-1;
 		int groupedIterations;
-		int savePeriod;
-		int n_lbfgs_memory;
+		int savePeriod=100;
+		int n_lbfgs_memory=3;
 		bool performZeropadding[3] = { false, false, false };
-		scalar gamma;
-		scalar max_move;
+		scalar gamma= 0.00176085964411;
+		scalar max_move=200;
+		int GPU_ID=0;
 	} VulkanSpiritLaunchConfiguration;
 
 	typedef struct {
@@ -188,10 +189,10 @@ namespace VulkanCompute
 		VkCommandPool commandPool = {};
 		VkFence fence = {};
 
-		VkFFT::VkFFTConfiguration forward_configuration;
-		VkFFT::VkFFTConfiguration convolution_configuration;
-		VkFFT::VkFFTApplication app_convolution;
-		VkFFT::VkFFTApplication app_kernel;
+		VkFFTConfiguration forward_configuration;
+		VkFFTConfiguration convolution_configuration;
+		VkFFTApplication app_convolution;
+		VkFFTApplication app_kernel;
 
 		VulkanLBFGS vulkanLBFGS = {};
 		VkCommandBuffer commandBufferFFT;
@@ -389,14 +390,8 @@ namespace VulkanCompute
 
 			std::vector<VkPhysicalDevice> devices(deviceCount);
 			vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
-
-
-			for (VkPhysicalDevice device : devices) {
-				if (true) {
-					physicalDevice = device;
-					break;
-				}
-			}
+			physicalDevice = devices[launchConfiguration.GPU_ID];
+						
 		}
 		uint32_t getComputeQueueFamilyIndex() {
 			uint32_t queueFamilyCount;
@@ -652,14 +647,14 @@ namespace VulkanCompute
 				}
 
 				forward_configuration.performR2C = true;
-				forward_configuration.vectorDimension = 6;
+				forward_configuration.coordinateFeatures = 6;
 				forward_configuration.isInputFormatted = false;
 				forward_configuration.isOutputFormatted = false;
 				forward_configuration.device = &device;
 
 				sprintf(forward_configuration.shaderPath, SHADER_DIR);
 				
-				bufferSizeKernel = forward_configuration.vectorDimension * 2 * sizeof(scalar) * (forward_configuration.size[0] / 2 + 1) * (forward_configuration.size[1]) * (forward_configuration.size[2]);
+				bufferSizeKernel = forward_configuration.coordinateFeatures * 2 * sizeof(scalar) * (forward_configuration.size[0] / 2 + 1) * (forward_configuration.size[1]) * (forward_configuration.size[2]);
 				allocateBuffer(&kernel, &bufferMemoryKernel, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_HEAP_DEVICE_LOCAL_BIT, bufferSizeKernel);
 
 				forward_configuration.buffer = &kernel;
@@ -677,13 +672,14 @@ namespace VulkanCompute
 					convolution_configuration.performZeropadding[2] = launchConfiguration.performZeropadding[2];
 				convolution_configuration.performConvolution = true;
 				convolution_configuration.symmetricKernel = true;//Specify if convolution kernel is symmetric. In this case we only pass upper triangle part of it in the form of: (xx, xy, yy) for 2d and (xx, xy, xz, yy, yz, zz) for 3d.
-				convolution_configuration.vectorDimension = 3;
+				convolution_configuration.matrixConvolution = 3;
+				convolution_configuration.coordinateFeatures = 3;
 				convolution_configuration.isInputFormatted = true;
 				convolution_configuration.isOutputFormatted = true;
 				convolution_configuration.kernel = &kernel;
 				convolution_configuration.kernelSize = &bufferSizeKernel;
 
-				bufferSizeFFT = convolution_configuration.vectorDimension * 2 * sizeof(scalar) * (forward_configuration.size[0] / 2 + 1) * (forward_configuration.size[1]) * (forward_configuration.size[2]);
+				bufferSizeFFT = convolution_configuration.coordinateFeatures * 2 * sizeof(scalar) * (forward_configuration.size[0] / 2 + 1) * (forward_configuration.size[1]) * (forward_configuration.size[2]);
 				allocateBuffer(&bufferFFT, &bufferMemoryFFT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_HEAP_DEVICE_LOCAL_BIT, bufferSizeFFT);
 
 				convolution_configuration.buffer = &bufferFFT;
@@ -774,7 +770,7 @@ namespace VulkanCompute
 			//we transform kernel and store it in GPU. we can upload it in two passes in spins buffer and do r2c fft
 			
 			scalar* data = (scalar*)malloc(bufferSizeKernel);
-			for (uint32_t v = 0; v < forward_configuration.vectorDimension; ++v) {
+			for (uint32_t v = 0; v < forward_configuration.coordinateFeatures; ++v) {
 				for (uint32_t k = 0; k < (forward_configuration.size[2]); ++k) {
 					for (uint32_t j = 0; j < (forward_configuration.size[1]); ++j) {
 						for (uint32_t i = 0; i < (forward_configuration.size[0]); ++i) {

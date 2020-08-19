@@ -2,6 +2,7 @@
 #include "utility/Handle_Signal.hpp"
 
 #include "Spirit/State.h"
+#include <data/State.hpp>
 
 #include <data/Spin_System.hpp>
 #include <data/Spin_System_Chain.hpp>
@@ -12,7 +13,7 @@
 #include "Spirit/Simulation.h"
 #include "Spirit/Log.h"
 #include "Spirit/IO.h"
-
+#include <engine/Hamiltonian_Micromagnetic.hpp>
 #ifdef _OPENMP
     #include <omp.h>
 #endif
@@ -78,6 +79,29 @@ int main(int argc, char ** argv)
 
     // // First image is plus-z with a Bloch skyrmion at the center
      Configuration_PlusZ(state.get());
+     std::shared_ptr<Data::Spin_System> image;
+     std::shared_ptr<Data::Spin_System_Chain> chain;
+
+     // Fetch correct indices and pointers
+     int idx_image = -1;
+     int idx_chain = -1;
+     from_indices(state.get(), idx_image, idx_chain, image, chain);
+     auto ham = (Engine::Hamiltonian_Micromagnetic*) image->hamiltonian.get();
+     for (int k = 0; k < image->geometry->n_cells[2]; k++) {
+         for (int j = 0; j < image->geometry->n_cells[1]; j++) {
+             for (int i = 0; i < image->geometry->n_cells[0]; i++) {
+                 ham->regions[i + j * image->geometry->n_cells[0] + k * image->geometry->n_cells[0] * image->geometry->n_cells[1]] = 1;//will set all spins to 1 - frozen.
+             }
+         }
+     }
+     //for (int k = 5; k < image->geometry->n_cells[2]-5; k++) {
+         for (int j = 5; j < image->geometry->n_cells[1]-5; j++) {
+             for (int i = 5; i < image->geometry->n_cells[0]-5; i++) {
+                 ham->regions[i+j* image->geometry->n_cells[0]+0* image->geometry->n_cells[0]* image->geometry->n_cells[1]] = 0;//will set inner spins to 0 - free.
+             }
+         }
+    // }
+     ham->init_vulkan(&image->app);
      //float dir[3] = { 1,1,1};
      //Configuration_Domain(state.get(), dir);
      //Configuration_APStripe(state.get());
@@ -87,8 +111,8 @@ int main(int argc, char ** argv)
      //Configuration_Skyrmion(state.get(), 50.0, 1.0, 0, true, false, false);
      //Configuration_Hopfion(state.get(), 40, 1.0);
      //Configuration_SpinSpiral(State * state);//
-    std::string ovf_file = std::string("input/relaxed_problem4_256x64") + std::string(".ovf");
-    IO_Image_Read(state.get(), ovf_file.c_str());
+    //std::string ovf_file = std::string("output/hopflllong") + std::string(".ovf");
+    //IO_Image_Read(state.get(), ovf_file.c_str());
      //Hamiltonian_Set_Field_From_Python(state.get());
     // // Last image is plus-z
     // Chain_Jump_To_Image(state.get(), Chain_Get_NOI(state.get())-1);
@@ -144,7 +168,7 @@ int main(int argc, char ** argv)
         //----------------------- LLG Iterations ----------------------------------------
         //std::thread t1 (&Simulation_LLG_Start, state.get(), Solver_VP_OSO, -1, -1, false, -1, -1);
         //t1.join();
-        //Simulation_LLG_Start(state.get(), Solver_LBFGS_OSO);
+        Simulation_LLG_Start(state.get(), Solver_RungeKutta4);
 
         //-------------------------------------------------------------------------------
     #endif
