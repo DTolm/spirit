@@ -317,7 +317,45 @@ void Hamiltonian_Set_Field(State *state, float magnitude, const float * normal, 
         spirit_handle_exception_api(idx_image, idx_chain);
     }
 }
+void Hamiltonian_Set_Regions(State* state, int* regions, int idx_image, int idx_chain) noexcept
+try
+{
+    std::shared_ptr<Data::Spin_System> image;
+    std::shared_ptr<Data::Spin_System_Chain> chain;
 
+    // Fetch correct indices and pointers
+    from_indices(state, idx_image, idx_chain, image, chain);
+
+    if (image->hamiltonian->Name() != "Heisenberg" && image->hamiltonian->Name() != "Micromagnetic")
+    {
+        Log(Utility::Log_Level::Warning, Utility::Log_Sender::API,
+            "External field cannot be set on " + image->hamiltonian->Name(), idx_image, idx_chain);
+        return;
+    }
+
+    // Lock mutex because simulations may be running
+    image->Lock();
+
+    try
+    {
+        image->app.updateRegions(regions);
+    }
+    catch (...)
+    {
+        spirit_handle_exception_api(idx_image, idx_chain);
+    }
+
+    // Unlock mutex
+    image->Unlock();
+
+    Log(Utility::Log_Level::Info, Utility::Log_Sender::API,
+        fmt::format("Set regions to user-defined"),
+        idx_image, idx_chain);
+}
+catch (...)
+{
+    spirit_handle_exception_api(idx_image, idx_chain);
+}
 void Hamiltonian_Set_Field_Regions(State *state, float magnitude, const float * normal, int region_id, int idx_image, int idx_chain) noexcept
 try
 {

@@ -700,19 +700,9 @@ namespace VulkanCompute
 			ubo.n = SIZES[0] * SIZES[1] * SIZES[2];
 			transferDataFromCPU(&ubo, sizeof(VulkanDimensions), &uboDimensions);
 
-			int* data_regions = (int*)malloc(sizeof(int)* SIZES[0] * SIZES[1] * SIZES[2]);
-			for (uint32_t i = 0; i < SIZES[0] * SIZES[1] * SIZES[2]; ++i) {
-				data_regions[i] = regions[i];
-			}
-			transferDataFromCPU(data_regions, bufferSizeRegions, &bufferRegions);
-			delete[] data_regions;
+			updateRegions(regions.data());
+			updateRegionsBook(regions_book, region_num);
 
-			Regionvalues* data_regions_book = (Regionvalues*)malloc(sizeof(Regionvalues) * region_num);
-			for (uint32_t i = 0; i < region_num; ++i) {
-				data_regions_book[i] = regions_book[i];
-			}
-			transferDataFromCPU(data_regions_book, bufferSizeRegions_Book, &bufferRegions_Book);
-			delete[] data_regions_book;
 		}
 		void init_solver(int solver_id) {
 			launchConfiguration.solver_type = solver_id;
@@ -743,6 +733,15 @@ namespace VulkanCompute
 			}
 			transferDataFromCPU(data_regions_book, bufferSizeRegions_Book, &bufferRegions_Book);
 			delete[] data_regions_book;
+		}
+		void updateRegions(int* regions) {
+			int* data_regions = (int*)malloc(sizeof(int) * SIZES[0] * SIZES[1] * SIZES[2]);
+			for (uint32_t i = 0; i < SIZES[0] * SIZES[1] * SIZES[2]; ++i) {
+				data_regions[i] = regions[i];
+			}
+			transferDataFromCPU(data_regions, bufferSizeRegions, &bufferRegions);
+			delete[] data_regions;
+
 		}
 		void freeLastSolver() {
 			switch (launchConfiguration.solver_type) {

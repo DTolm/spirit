@@ -2,8 +2,8 @@
 #include "utility/Handle_Signal.hpp"
 
 #include "Spirit/State.h"
-#include <data/State.hpp>
 
+#include "data/State.hpp"
 #include <data/Spin_System.hpp>
 #include <data/Spin_System_Chain.hpp>
 #include "Spirit/Hamiltonian.h"
@@ -13,7 +13,7 @@
 #include "Spirit/Simulation.h"
 #include "Spirit/Log.h"
 #include "Spirit/IO.h"
-#include <engine/Hamiltonian_Micromagnetic.hpp>
+
 #ifdef _OPENMP
     #include <omp.h>
 #endif
@@ -78,30 +78,31 @@ int main(int argc, char ** argv)
     // Chain_Set_Length(state.get(), 12);
 
     // // First image is plus-z with a Bloch skyrmion at the center
-     Configuration_PlusZ(state.get());
-     std::shared_ptr<Data::Spin_System> image;
-     std::shared_ptr<Data::Spin_System_Chain> chain;
+    Configuration_PlusZ(state.get());
+    std::shared_ptr<Data::Spin_System> image;
+    std::shared_ptr<Data::Spin_System_Chain> chain;
 
-     // Fetch correct indices and pointers
-     int idx_image = -1;
-     int idx_chain = -1;
-     from_indices(state.get(), idx_image, idx_chain, image, chain);
-     auto ham = (Engine::Hamiltonian_Micromagnetic*) image->hamiltonian.get();
-     for (int k = 0; k < image->geometry->n_cells[2]; k++) {
-         for (int j = 0; j < image->geometry->n_cells[1]; j++) {
-             for (int i = 0; i < image->geometry->n_cells[0]; i++) {
-                 ham->regions[i + j * image->geometry->n_cells[0] + k * image->geometry->n_cells[0] * image->geometry->n_cells[1]] = 1;//will set all spins to 1 - frozen.
-             }
-         }
-     }
-     //for (int k = 5; k < image->geometry->n_cells[2]-5; k++) {
-         for (int j = 5; j < image->geometry->n_cells[1]-5; j++) {
-             for (int i = 5; i < image->geometry->n_cells[0]-5; i++) {
-                 ham->regions[i+j* image->geometry->n_cells[0]+0* image->geometry->n_cells[0]* image->geometry->n_cells[1]] = 0;//will set inner spins to 0 - free.
-             }
-         }
+    // Fetch correct indices and pointers
+    int idx_image = -1;
+    int idx_chain = -1;
+    from_indices(state.get(), idx_image, idx_chain, image, chain);
+    intfield regions=intfield(image->geometry->nos, 0);;
+    for (int k = 0; k < image->geometry->n_cells[2]; k++) {
+        for (int j = 0; j < image->geometry->n_cells[1]; j++) {
+            for (int i = 0; i < image->geometry->n_cells[0]; i++) {
+                regions[i + j * image->geometry->n_cells[0] + k * image->geometry->n_cells[0] * image->geometry->n_cells[1]] = 1;//will set all spins to 1 - frozen.
+            }
+        }
+    }
+    //for (int k = 5; k < image->geometry->n_cells[2]-5; k++) {
+    for (int j = 5; j < image->geometry->n_cells[1]-5; j++) {
+        for (int i = 5; i < image->geometry->n_cells[0]-5; i++) {
+            regions[i+j* image->geometry->n_cells[0]+0* image->geometry->n_cells[0]* image->geometry->n_cells[1]] = 0;//will set inner spins to 0 - free.
+        }
+    }
+    Hamiltonian_Set_Regions(state.get(), regions.data());
     // }
-     ham->init_vulkan(&image->app);
+
      //float dir[3] = { 1,1,1};
      //Configuration_Domain(state.get(), dir);
      //Configuration_APStripe(state.get());

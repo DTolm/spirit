@@ -164,6 +164,19 @@ namespace Engine
 		//	launchConfiguration.DDI = true;
 	//	launchConfiguration.double_precision_rotate = false;
 		//std::cout << launchConfiguration.savePeriod << " " << launchConfiguration.groupedIterations << "\n";
+		for (int k = 0; k < geometry->n_cells[2]; k++) {
+			for (int j = 0; j < geometry->n_cells[1]; j++) {
+				for (int i = 0; i < geometry->n_cells[0]; i++) {
+					regions[i + j * geometry->n_cells[0] + k * geometry->n_cells[0] * geometry->n_cells[1]] = 1;//will set all spins to 1 - frozen.
+				}
+			}
+		}
+		//for (int k = 5; k < geometry->n_cells[2]-5; k++) {
+		for (int j = 5; j < geometry->n_cells[1] - 5; j++) {
+			for (int i = 5; i < geometry->n_cells[0] - 5; i++) {
+				regions[i + j * geometry->n_cells[0] + 0 * geometry->n_cells[0] * geometry->n_cells[1]] = 0;//will set inner spins to 0 - free.
+			}
+		}
 		app[0].init(regions_book, regions, region_num, geometry, &launchConfiguration);
 		if(launchConfiguration.DDI == true)
 			this->Prepare_DDI_vulkan(app);
@@ -892,7 +905,7 @@ namespace Engine
 		//scalar mult = 2.0133545*1e-28 * 0.057883817555 * 0.057883817555 / (4 * 3.141592653589793238462643383279502884197169399375105820974 * 1e-30);
 		//scalar mult = 1 / (4 * 3.141592653589793238462643383279502884197169399375105820974);
 		double mult = 1;// (4 * 3.141592653589793238462643383279502884197169399375105820974);
-		double accuracy = 12.0;
+		double accuracy = 6.0;
 		int npad_kernel = it_bounds_write_dipole[0] * it_bounds_write_dipole[1] * it_bounds_write_dipole[2];
 		//#pragma omp parallel for
 		double pi = 3.141592653589793238462643383279502884197169399375105820974;

@@ -201,7 +201,7 @@ State * State_Setup(const char * config_file, bool quiet) noexcept
         // Log
         Log(Log_Level::All, Log_Sender::All, "=====================================================");
         Log(Log_Level::All, Log_Sender::All, "============ Create: Vulkan API =====================");
-        //state->active_image->hamiltonian->init_vulkan(&state->active_image->app);
+        state->active_image->hamiltonian->init_vulkan(&state->active_image->app);
         Log(Log_Level::All, Log_Sender::All, "=====================================================");
         Log.Append_to_File();
 

@@ -89,7 +89,8 @@ PREFIX void Hamiltonian_Set_Boundary_Conditions(State *state, const bool* period
 PREFIX void Hamiltonian_Set_Cell_Sizes(State *state, const float * cell_sizes, int region_id, int idx_image=-1, int idx_chain=-1) SUFFIX;
 //Set Ms for micromagnetics
 PREFIX void Hamiltonian_Set_Ms(State *state, const float Ms, int region_id, int idx_image=-1, int idx_chain=-1) SUFFIX;
-
+//Set regions
+PREFIX void Hamiltonian_Set_Regions(State* state, int* regions, int idx_image = -1, int idx_chain = -1) SUFFIX;
 
 // Set the (homogeneous) external magnetic field [T]
 PREFIX void Hamiltonian_Set_Field(State *state, float magnitude, const float* normal, int idx_image=-1, int idx_chain=-1) SUFFIX;
