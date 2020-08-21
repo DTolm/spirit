@@ -445,8 +445,8 @@ void main() {
 		for (uint i=1; i < num_gradient_components;i++){
 			energy_output+=reduceEnergy[i];
 		}
-		energy[n+icell]=energy[icell];
-		energy[icell]=energy_output;
+		energy[n+icell]=energy[icell];//old
+		energy[icell]=energy_output;//new
 		
 		mx = spins[icell];
 		my = spins[icell+pad];
@@ -464,12 +464,12 @@ void main() {
 		if (gl_SubgroupInvocationID == 0)
 		{
 			for (uint i=0; i < num_gradient_components;i++){
-				sdata[gl_SubgroupID+i*sumSubGroupSize]=reduceEnergy[i];
+				sdata[gl_SubgroupID+(i+1)*sumSubGroupSize]=reduceEnergy[i];
 			}
-			sdata[gl_SubgroupID+num_gradient_components*sumSubGroupSize] = mx;
-			sdata[gl_SubgroupID+(num_gradient_components+1)*sumSubGroupSize] = my;
-			sdata[gl_SubgroupID+(num_gradient_components+2)*sumSubGroupSize] = mz;
-			sdata[gl_SubgroupID+(num_gradient_components+3)*sumSubGroupSize] = max_torque;
+			sdata[gl_SubgroupID+(num_gradient_components+1)*sumSubGroupSize] = mx;
+			sdata[gl_SubgroupID+(num_gradient_components+2)*sumSubGroupSize] = my;
+			sdata[gl_SubgroupID+(num_gradient_components+3)*sumSubGroupSize] = mz;
+			sdata[gl_SubgroupID] = max_torque;
 		}
 
 		memoryBarrierShared();
@@ -478,19 +478,19 @@ void main() {
 		if (gl_SubgroupID == 0)
 		{
 			for (uint i=0; i < num_gradient_components;i++){
-				reduceEnergy[i] = gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID+i*sumSubGroupSize] : 0;
+				reduceEnergy[i] = gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID+(i+1)*sumSubGroupSize] : 0;
 				reduceEnergy[i] = subgroupAdd(reduceEnergy[i]);
 			}
-			mx= gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID+num_gradient_components*sumSubGroupSize] : 0;
+			mx= gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID+(num_gradient_components+1)*sumSubGroupSize] : 0;
 			mx = subgroupAdd(mx);
 			
-			my= gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID+(num_gradient_components+1)*sumSubGroupSize] : 0;
+			my= gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID+(num_gradient_components+2)*sumSubGroupSize] : 0;
 			my = subgroupAdd(my);
 			
-			mz= gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID+(num_gradient_components+2)*sumSubGroupSize] : 0;
+			mz= gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID+(num_gradient_components+3)*sumSubGroupSize] : 0;
 			mz = subgroupAdd(mz);
 			
-			max_torque= gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID+(num_gradient_components+3)*sumSubGroupSize] : 0;
+			max_torque= gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID] : 0;
 			max_torque = subgroupMax(max_torque);
 		}
 
@@ -500,13 +500,13 @@ void main() {
 			uint num_WorkGroups=gl_NumWorkGroups.x*gl_NumWorkGroups.y*gl_NumWorkGroups.z;
 			
 			for (uint i=0; i < num_gradient_components;i++){
-				partial_sums[work_ID+i*num_WorkGroups]=reduceEnergy[i];
+				partial_sums[work_ID+(i+1)*num_WorkGroups]=reduceEnergy[i];
 			}
 			
-			partial_sums[work_ID+num_gradient_components*num_WorkGroups] = mx;
-			partial_sums[work_ID+(num_gradient_components+1)*num_WorkGroups] = my;
-			partial_sums[work_ID+(num_gradient_components+2)*num_WorkGroups] = mz;
-			partial_sums[work_ID+(num_gradient_components+3)*num_WorkGroups] = max_torque;
+			partial_sums[work_ID+(num_gradient_components+1)*num_WorkGroups] = mx;
+			partial_sums[work_ID+(num_gradient_components+2)*num_WorkGroups] = my;
+			partial_sums[work_ID+(num_gradient_components+3)*num_WorkGroups] = mz;
+			partial_sums[work_ID] = max_torque;
 		}
 	}
 }

@@ -52,7 +52,7 @@ void HamiltonianMicromagneticWidget::setData()
 
 void HamiltonianMicromagneticWidget::updateData()
 {
-    float d, vd[3], jij[100], dij[100];
+    float d, vd[3], jij[100], dij[100], d2[2];
     float tensor[9];
     int region_num;
     int ddi_method, ddi_n_periodic_images[3];
@@ -81,23 +81,36 @@ void HamiltonianMicromagneticWidget::updateData()
     this->lineEdit_extHx_aniso->setText(QString::number(vd[0]));
     this->lineEdit_extHy_aniso->setText(QString::number(vd[1]));
     this->lineEdit_extHz_aniso->setText(QString::number(vd[2]));
-    if (d > 0.0) this->checkBox_extH_aniso->setChecked(true);
-
+    if (d != 0) this->checkBox_extH_aniso->setChecked(true);
+    else this->checkBox_extH_aniso->setChecked(false);
     // Anisotropy
     Hamiltonian_Get_Anisotropy_Regions(state.get(), &d, vd,this->comboBox_region->currentIndex());
     this->lineEdit_ani_aniso->setText(QString::number(d));
     this->lineEdit_anix_aniso->setText(QString::number(vd[0]));
     this->lineEdit_aniy_aniso->setText(QString::number(vd[1]));
     this->lineEdit_aniz_aniso->setText(QString::number(vd[2]));
-    if (d > 0.0) this->checkBox_ani_aniso->setChecked(true);
+    if (d != 0) this->checkBox_ani_aniso->setChecked(true);
+    else this->checkBox_ani_aniso->setChecked(false);
 
     Hamiltonian_Get_Exchange_Tensor(state.get(), &d,this->comboBox_region->currentIndex());
 	this->lineEdit_exch_00->setText(QString::number(d));
-	this->checkBox_exchange->setChecked(true);
+    if (d != 0) this->checkBox_exchange->setChecked(true);
+    else this->checkBox_exchange->setChecked(false);
 
-	Hamiltonian_Get_DMI_Tensor(state.get(), &d,this->comboBox_region->currentIndex());
-	this->lineEdit_dmi_00->setText(QString::number(d));
-	this->checkBox_dmi->setChecked(true);
+	Hamiltonian_Get_DMI_Tensor(state.get(), d2,this->comboBox_region->currentIndex());
+	this->lineEdit_dmi_00->setText(QString::number(d2[0]));
+    this->lineEdit_dmi_01->setText(QString::number(d2[1]));
+	if ((d2[0]!=0)||(d2[1]!=0)) this->checkBox_dmi->setChecked(true);
+    else this->checkBox_dmi->setChecked(false);
+
+    Hamiltonian_Get_DDI_coefficient(state.get(), d2, this->comboBox_region->currentIndex());
+    this->lineEdit_ddi->setText(QString::number(d2[0]));
+    if (d2[1]) this->checkBox_ddi->setChecked(true);
+    else this->checkBox_ddi->setChecked(false);
+
+    Hamiltonian_Get_frozen_spins(state.get(), &d, this->comboBox_region->currentIndex());
+    if (d != 0) this->checkBox_frozen_spins->setChecked(true);
+    else this->checkBox_frozen_spins->setChecked(false);
     // // Exchange interaction (shells)
     // Hamiltonian_Get_Exchange_Shells(state.get(), &n_neigh_shells_exchange, jij);
     // if (n_neigh_shells_exchange > 0) this->checkBox_exchange->setChecked(true);
@@ -118,21 +131,8 @@ void HamiltonianMicromagneticWidget::updateData()
     // this->set_nshells_dmi();
     // for (int i = 0; i < n_neigh_shells_dmi; ++i) this->dmi_shells[i]->setValue(dij[i]);
 
-    // DDI
-    Hamiltonian_Get_DDI(state.get(), &ddi_method, ddi_n_periodic_images, &d);
-    this->checkBox_ddi->setChecked( ddi_method != SPIRIT_DDI_METHOD_NONE );
-    if( ddi_method == SPIRIT_DDI_METHOD_NONE )
-        this->comboBox_ddi_method->setCurrentIndex(0);
-    else if( ddi_method == SPIRIT_DDI_METHOD_FFT )
-        this->comboBox_ddi_method->setCurrentIndex(0);
-    else if( ddi_method == SPIRIT_DDI_METHOD_FMM )
-        this->comboBox_ddi_method->setCurrentIndex(1);
-    else if( ddi_method == SPIRIT_DDI_METHOD_CUTOFF )
-        this->comboBox_ddi_method->setCurrentIndex(2);
-    this->spinBox_ddi_n_periodic_a->setValue(ddi_n_periodic_images[0]);
-    this->spinBox_ddi_n_periodic_b->setValue(ddi_n_periodic_images[1]);
-    this->spinBox_ddi_n_periodic_c->setValue(ddi_n_periodic_images[2]);
-    this->doubleSpinBox_ddi_radius->setValue(d);
+
+
 }
 void HamiltonianMicromagneticWidget::clicked_region()
 {
@@ -275,7 +275,10 @@ void HamiltonianMicromagneticWidget::set_external_field()
         // External magnetic field
         //		magnitude
         if (this->checkBox_extH_aniso->isChecked()) d = this->lineEdit_extH_aniso->text().toFloat();
-        else d = 0.0;
+        else {
+            this->checkBox_extH_aniso->setText(QString::number(0));
+            d = 0.0;
+        }
         //		normal
         vd[0] = lineEdit_extHx_aniso->text().toFloat();
         vd[1] = lineEdit_extHy_aniso->text().toFloat();
@@ -330,7 +333,10 @@ void HamiltonianMicromagneticWidget::set_anisotropy()
         // Anisotropy
         //		magnitude
         if (this->checkBox_ani_aniso->isChecked()) d = this->lineEdit_ani_aniso->text().toFloat();
-        else d = 0.0;
+        else {
+            this->lineEdit_ani_aniso->setText(QString::number(0));
+            d = 0.0;
+        }
         //		normal
         vd[0] = lineEdit_anix_aniso->text().toFloat();
         vd[1] = lineEdit_aniy_aniso->text().toFloat();
@@ -385,6 +391,7 @@ void HamiltonianMicromagneticWidget::set_exchange()
             Hamiltonian_Set_Exchange_Tensor(state.get(), tensor, this->comboBox_region->currentIndex(), idx_image);
         } else{
         	float tensor=0;
+            this->lineEdit_exch_00->setText(QString::number(0));
         	Hamiltonian_Set_Exchange_Tensor(state.get(), tensor, this->comboBox_region->currentIndex(), idx_image);
         }
 
@@ -417,11 +424,14 @@ void HamiltonianMicromagneticWidget::set_dmi()
     {
         if (this->checkBox_dmi->isChecked())
         {
-            float tensor;
-            tensor=lineEdit_dmi_00->text().toFloat();
+            float tensor[2] = { 0,0 };
+            tensor[0] = lineEdit_dmi_00->text().toFloat();
+            tensor[1] = lineEdit_dmi_01->text().toFloat();
             Hamiltonian_Set_DMI_Tensor(state.get(), tensor, this->comboBox_region->currentIndex(), idx_image);
         } else{
-        	float tensor=0;
+            float tensor[2] = { 0,0 };
+            this->lineEdit_dmi_00->setText(QString::number(0));
+            this->lineEdit_dmi_01->setText(QString::number(0));
 			Hamiltonian_Set_DMI_Tensor(state.get(), tensor, this->comboBox_region->currentIndex(), idx_image);
         }
 
@@ -442,6 +452,122 @@ void HamiltonianMicromagneticWidget::set_dmi()
     else if (this->comboBox_Hamiltonian_Ani_ApplyTo->currentText() == "All Images")
     {
         for (int img = 0; img<Chain_Get_NOI(state.get()); ++img)
+        {
+            apply(img);
+        }
+    }
+}
+void HamiltonianMicromagneticWidget::set_ddi_checkBox()
+{
+    // Closure to set the parameters of a specific spin system
+    auto apply = [this](int idx_image) -> void
+    {
+        float ddi = lineEdit_ddi->text().toFloat();
+        
+        if (this->checkBox_ddi->isChecked())
+        {
+            this->lineEdit_ddi->setText(QString::number(ddi));
+            Hamiltonian_Set_DDI_coefficient(state.get(), ddi, this->comboBox_region->currentIndex(), idx_image);
+        }
+        else {
+            this->lineEdit_ddi->setText(QString::number(0));
+               
+            Hamiltonian_Set_DDI_coefficient(state.get(), 0, -1, idx_image);
+        }
+        
+
+    };
+
+    if (this->comboBox_Hamiltonian_Ani_ApplyTo->currentText() == "Current Image")
+    {
+        apply(System_Get_Index(state.get()));
+    }
+    else if (this->comboBox_Hamiltonian_Ani_ApplyTo->currentText() == "Current Image Chain")
+    {
+        for (int i = 0; i < Chain_Get_NOI(state.get()); ++i)
+        {
+            apply(i);
+        }
+    }
+    else if (this->comboBox_Hamiltonian_Ani_ApplyTo->currentText() == "All Images")
+    {
+        for (int img = 0; img < Chain_Get_NOI(state.get()); ++img)
+        {
+            apply(img);
+        }
+    }
+}
+void HamiltonianMicromagneticWidget::set_ddi_lineEdit()
+{
+    // Closure to set the parameters of a specific spin system
+    auto apply = [this](int idx_image) -> void
+    {
+        float ddi = lineEdit_ddi->text().toFloat();
+        if (ddi != 0) {
+            if (this->checkBox_ddi->isChecked())
+                Hamiltonian_Set_DDI_coefficient(state.get(), ddi, this->comboBox_region->currentIndex(), idx_image);
+            else
+                this->checkBox_ddi->setChecked(true);
+            //Hamiltonian_Set_DDI_coefficient(state.get(), ddi, this->comboBox_region->currentIndex(), idx_image);
+        }
+        else {
+
+            Hamiltonian_Set_DDI_coefficient(state.get(), 0, this->comboBox_region->currentIndex(), idx_image);
+        }
+
+    };
+
+    if (this->comboBox_Hamiltonian_Ani_ApplyTo->currentText() == "Current Image")
+    {
+        apply(System_Get_Index(state.get()));
+    }
+    else if (this->comboBox_Hamiltonian_Ani_ApplyTo->currentText() == "Current Image Chain")
+    {
+        for (int i = 0; i < Chain_Get_NOI(state.get()); ++i)
+        {
+            apply(i);
+        }
+    }
+    else if (this->comboBox_Hamiltonian_Ani_ApplyTo->currentText() == "All Images")
+    {
+        for (int img = 0; img < Chain_Get_NOI(state.get()); ++img)
+        {
+            apply(img);
+        }
+    }
+}
+void HamiltonianMicromagneticWidget::set_frozen_spins()
+{
+    // Closure to set the parameters of a specific spin system
+    auto apply = [this](int idx_image) -> void
+    {
+        if (this->checkBox_frozen_spins->isChecked())
+        {
+            float frozen_spins=1;
+            Hamiltonian_Set_frozen_spins(state.get(), frozen_spins, this->comboBox_region->currentIndex(), idx_image);
+        }
+        else {
+            float frozen_spins = 0;
+            Hamiltonian_Set_frozen_spins(state.get(), frozen_spins, this->comboBox_region->currentIndex(), idx_image);
+        }
+
+
+    };
+
+    if (this->comboBox_Hamiltonian_Ani_ApplyTo->currentText() == "Current Image")
+    {
+        apply(System_Get_Index(state.get()));
+    }
+    else if (this->comboBox_Hamiltonian_Ani_ApplyTo->currentText() == "Current Image Chain")
+    {
+        for (int i = 0; i < Chain_Get_NOI(state.get()); ++i)
+        {
+            apply(i);
+        }
+    }
+    else if (this->comboBox_Hamiltonian_Ani_ApplyTo->currentText() == "All Images")
+    {
+        for (int img = 0; img < Chain_Get_NOI(state.get()); ++img)
         {
             apply(img);
         }
@@ -520,5 +646,11 @@ void HamiltonianMicromagneticWidget::Setup_Slots()
 	// DMI
 	connect(this->checkBox_dmi, SIGNAL(stateChanged(int)), this, SLOT(set_dmi()));
 	connect(this->lineEdit_dmi_00, SIGNAL(returnPressed()), this, SLOT(set_dmi()));
-
+    connect(this->lineEdit_dmi_01, SIGNAL(returnPressed()), this, SLOT(set_dmi()));
+    // DDI
+    connect(this->checkBox_ddi, SIGNAL(stateChanged(int)), this, SLOT(set_ddi_checkBox()));
+    connect(this->lineEdit_ddi, SIGNAL(returnPressed()), this, SLOT(set_ddi_lineEdit()));
+    //frozen_spins
+    connect(this->checkBox_frozen_spins, SIGNAL(stateChanged(int)), this, SLOT(set_frozen_spins()));
+    
 }

@@ -1,0 +1,73 @@
+#version 450
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+
+layout(std430, binding = 0) readonly buffer Input
+{
+   float inputs[];
+};
+layout(std430, binding = 1) writeonly buffer PartialResults
+{
+   float partial_results[];
+};
+
+layout (local_size_x_id = 1) in;
+layout (constant_id = 2) const uint sumSubGroupSize = 64;
+layout (constant_id = 3) const uint num_reduce = 1;
+layout(push_constant) uniform PushConsts
+{
+  uint n;
+
+} consts;
+
+shared float sdata[num_reduce*sumSubGroupSize];
+
+void main()
+{
+    float data[num_reduce];
+	for (uint i=0;i<num_reduce;i++){
+		data[i] =0;
+	}
+    if (gl_GlobalInvocationID.x < consts.n)
+    {	
+		for (uint i=0;i<num_reduce;i++){
+			data[i] = inputs[gl_GlobalInvocationID.x+i*consts.n];
+		}
+    }
+	
+	data[0] = subgroupMax(data[0]);//max torque
+	for (uint i=1;i<num_reduce;i++){
+		data[i] = subgroupAdd(data[i]);//average energies
+	}
+
+
+
+    if (gl_SubgroupInvocationID == 0)
+    {
+		for (uint i=0;i<num_reduce;i++){
+			sdata[gl_SubgroupID+i*sumSubGroupSize] = data[i];
+		}
+		
+    }
+
+    memoryBarrierShared();
+    barrier();
+
+    if (gl_SubgroupID == 0)
+    {
+		data[0] = gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID] : 0;
+		data[0] = subgroupMax(data[0]);
+		for (uint i=1;i<num_reduce;i++){
+			data[i] = gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID+i*sumSubGroupSize] : 0;
+			data[i] = subgroupAdd(data[i]);
+
+		}
+    }
+
+    if (gl_LocalInvocationID.x == 0)
+    {
+		for (uint i=0;i<num_reduce;i++){
+	
+			partial_results[gl_WorkGroupID.x+i*gl_NumWorkGroups.x] = data[i];
+		}
+    }
+}

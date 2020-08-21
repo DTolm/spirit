@@ -164,22 +164,10 @@ namespace Engine
 		//	launchConfiguration.DDI = true;
 	//	launchConfiguration.double_precision_rotate = false;
 		//std::cout << launchConfiguration.savePeriod << " " << launchConfiguration.groupedIterations << "\n";
-		for (int k = 0; k < geometry->n_cells[2]; k++) {
-			for (int j = 0; j < geometry->n_cells[1]; j++) {
-				for (int i = 0; i < geometry->n_cells[0]; i++) {
-					regions[i + j * geometry->n_cells[0] + k * geometry->n_cells[0] * geometry->n_cells[1]] = 1;//will set all spins to 1 - frozen.
-				}
-			}
-		}
-		//for (int k = 5; k < geometry->n_cells[2]-5; k++) {
-		for (int j = 5; j < geometry->n_cells[1] - 5; j++) {
-			for (int i = 5; i < geometry->n_cells[0] - 5; i++) {
-				regions[i + j * geometry->n_cells[0] + 0 * geometry->n_cells[0] * geometry->n_cells[1]] = 0;//will set inner spins to 0 - free.
-			}
-		}
+		
 		app[0].init(regions_book, regions, region_num, geometry, &launchConfiguration);
-		if(launchConfiguration.DDI == true)
-			this->Prepare_DDI_vulkan(app);
+		//if(launchConfiguration.DDI == true)
+		//	this->Prepare_DDI_vulkan(app);
 		/*
 		if (geometry->n_cells[2] == 1) {
 			int npad_kernel = 2*geometry->n_cells[1] * (geometry->n_cells[0] + 1);
@@ -843,8 +831,6 @@ namespace Engine
 		n_cells_padded[2] = ((geometry->n_cells[2] > 1) && (launchConfiguration.performZeropadding[2])) ? 2 * geometry->n_cells[2] : geometry->n_cells[2];
 
 		sublattice_size = n_cells_padded[0] * n_cells_padded[1] * n_cells_padded[2];
-		//printf("111 %d %d %d\n", n_cells_padded[0],n_cells_padded[1],n_cells_padded[2]);
-
 		inter_sublattice_lookup.resize(geometry->n_cell_atoms * geometry->n_cell_atoms);
 
 		//we dont need to transform over length 1 dims
@@ -905,18 +891,15 @@ namespace Engine
 		//scalar mult = 2.0133545*1e-28 * 0.057883817555 * 0.057883817555 / (4 * 3.141592653589793238462643383279502884197169399375105820974 * 1e-30);
 		//scalar mult = 1 / (4 * 3.141592653589793238462643383279502884197169399375105820974);
 		double mult = 1;// (4 * 3.141592653589793238462643383279502884197169399375105820974);
-		double accuracy = 6.0;
+		double accuracy = 10.0;
 		int npad_kernel = it_bounds_write_dipole[0] * it_bounds_write_dipole[1] * it_bounds_write_dipole[2];
 		//#pragma omp parallel for
 		double pi = 3.141592653589793238462643383279502884197169399375105820974;
 		double L = std::min(cell_sizes[0], cell_sizes[1]);
 		L = std::min(L, (double)cell_sizes[2]);
 		int range_min[3] = { floor(-(it_bounds_write_dipole[0] - 1.0) / 2.0) , floor(-(it_bounds_write_dipole[1] - 1.0) / 2.0) , floor(-(it_bounds_write_dipole[2] - 1.0) / 2.0) };
-
-		//int range_min[3] = {  -(it_bounds_write_dipole[0] - 1) / 2 ,-(it_bounds_write_dipole[1] - 1) / 2 , -(it_bounds_write_dipole[2] - 1) / 2};
 		int range_max[3] = { (it_bounds_write_dipole[0] - 1) / 2 , (it_bounds_write_dipole[1] - 1) / 2 , (it_bounds_write_dipole[2] - 1) / 2 };
-		//std::cout << range_min[0] << " " << range_min[1] << " " << range_min[2] << "\n";
-		//std::cout << range_max[0] << " " << range_max[1] << " " << range_max[2] << "\n";
+
 		//mumax3 kernel as I don't have anything better at this moment
 		for (int s = 0; s < 3; ++s) {
 			int u = s;
@@ -1004,8 +987,6 @@ namespace Engine
 							int block = s * 2 + d;
 							if (s == 2) block = 5;
 							fft_dipole_inputs[x + y * it_bounds_write_dipole[0] + z * it_bounds_write_dipole[0] * it_bounds_write_dipole[1] + npad_kernel * block] += mult * B[d];
-
-							//fft_dipole_inputs[(x - range_min[0] )+ (y- range_min[1]) * it_bounds_write_dipole[0] + 6 * (z- range_min[2]) * it_bounds_write_dipole[0] * it_bounds_write_dipole[1] + npad_kernel * block] += mult * B[d];
 						}
 					}
 				}
@@ -1057,63 +1038,11 @@ namespace Engine
 
 				}
 			}
-		}/*
-		//for (int i = 512*256+32*6*512*512; i < 512 * 256 + 32 * 6 * 512 * 512+512; i++) {
-		for (int i = 0; i < 512; i++) {
-			std::cout << fft_dipole_inputs[i + 1 * npad_kernel] << "\n";
 		}
-		std::cout  << "ss\n";
-		for (int i = 0; i < 6 * sublattice_size; i++) {
-			fft_dipole_inputs[i] = 0;
-		}
-		mult = 1;
-		for (int idx0 = 0; idx0 < sublattice_size; ++idx0)
-		{
-			tupel_from_idx_2(idx0, tupel, it_bounds_write_dipole.data(), 3); // tupel now is {a, b, c}
-			auto& a = tupel[0];
-			auto& b = tupel[1];
-			auto& c = tupel[2];
-			
-			int a_idx = a  < geometry->n_cells[0] ? a : a - it_bounds_write_dipole[0];
-			int b_idx = b  < geometry->n_cells[1] ? b : b - it_bounds_write_dipole[1];
-			int c_idx = c  < geometry->n_cells[2] ? c : c - it_bounds_write_dipole[2];
-			//int a_idx = a - geometry->n_cells[0];// < geometry->n_cells[0] ? a : a - it_bounds_write_dipole[0];
-			//int b_idx = b - geometry->n_cells[1];//< geometry->n_cells[1] ? b : b - it_bounds_write_dipole[1];
-			//int c_idx = c - geometry->n_cells[2];//< geometry->n_cells[2] ? c : c - it_bounds_write_dipole[2];
-			int idx = a * 1 + b * it_bounds_write_dipole[0] + c * it_bounds_write_dipole[0]* it_bounds_write_dipole[1]*6;
-			//int idx = b_inter * dipole_stride.basis + a * dipole_stride.a + b * dipole_stride.b + c * dipole_stride.c;
-			//std::cout<<it_bounds_write_dipole[0]<<"\n";
-
-			for (int i = 0; i < 2; i++) {
-				for (int j = 0; j < 2; j++) {
-					for (int k = 0; k < 2; k++) {
-						double r = sqrt((a_idx + i - 0.5) * (a_idx + i - 0.5) *  (double)cell_sizes[0] *  (double)cell_sizes[0] + (b_idx + j - 0.5) * (b_idx + j - 0.5) *  (double)cell_sizes[1] *  (double)cell_sizes[1] + (c_idx + k - 0.5) * (c_idx + k - 0.5) *  (double)cell_sizes[2] *  (double)cell_sizes[2]);
-						fft_dipole_inputs[idx] += mult * pow(-1.0, i + j + k) * atan(((c_idx + k - 0.5) * (b_idx + j - 0.5) *  (double)cell_sizes[1] *  (double)cell_sizes[2] /  (double)cell_sizes[0] / r / (a_idx + i - 0.5)));
-						//fft_dipole_inputs[idx + 1 * dipole_stride.comp] += -mult * pow(-1.0f, i + j + k) * log(abs(((c_idx + k - 0.5f)*  (double)cell_sizes[2] + r)/((c_idx + k - 0.5f)*  (double)cell_sizes[2] - r)));
-						//fft_dipole_inputs[idx + 2 * dipole_stride.comp] += -mult * pow(-1.0f, i + j + k) * log(abs(((b_idx + j - 0.5f)*  (double)cell_sizes[1] + r)/((b_idx + j - 0.5f)*  (double)cell_sizes[1] - r)));
-						fft_dipole_inputs[idx + 1 * npad_kernel] -= mult * pow(-1.0, i + j + k) * log((((c_idx + k - 0.5) *  (double)cell_sizes[2] + r)));
-						fft_dipole_inputs[idx + 2 * npad_kernel] -= mult * pow(-1.0, i + j + k) * log((((b_idx + j - 0.5) *  (double)cell_sizes[1] + r)));
-
-						fft_dipole_inputs[idx + 3 * npad_kernel] += mult * pow(-1.0, i + j + k) * atan(((a_idx + i - 0.5f) * (c_idx + k - 0.5) *  (double)cell_sizes[2] *  (double)cell_sizes[0] /  (double)cell_sizes[1] / r / (b_idx + j - 0.5)));
-						//fft_dipole_inputs[idx + 4 * dipole_stride.comp] += -mult * pow(-1.0f, i + j + k) * log(abs(((a_idx + i - 0.5f)*  (double)cell_sizes[0] + r)/((a_idx + i - 0.5f)*  (double)cell_sizes[0] - r)));
-						fft_dipole_inputs[idx + 4 * npad_kernel] -= mult * pow(-1.0, i + j + k) * log((((a_idx + i - 0.5) *  (double)cell_sizes[0] + r)));
-						fft_dipole_inputs[idx + 5 * npad_kernel] += mult * pow(-1.0, i + j + k) * atan(((b_idx + j - 0.5) * (a_idx + i - 0.5) *  (double)cell_sizes[0] *  (double)cell_sizes[1] /  (double)cell_sizes[2] / r / (c_idx + k - 0.5)));
-
-					}
-				}
-			}
-			
-		}
-		for (int i = 0; i < 512; i++) {
-			//for (int i = 512 * 256 + 32 * 6 * 512 * 512; i < 512 * 256 + 32 * 6 * 512 * 512 + 512; i++) {
-			std::cout << fft_dipole_inputs[i + 1 * npad_kernel] << "\n";
-		}*/
 		app[0].transformKernel(fft_dipole_inputs);
 		free(fft_dipole_inputs);
-		//FFT::batch_Four_3D(fft_plan_dipole);
-
-		//transformed_dipole_matrices = std::move(fft_plan_dipole.cpx_ptr);
-	}//end prepare
+		
+	}
 	void Hamiltonian_Micromagnetic::Prepare_Exchange()
 	{
 		//int bc[3] = { boundary_conditions[0],boundary_conditions[1],boundary_conditions[2] };

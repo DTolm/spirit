@@ -4,8 +4,8 @@
 #include "Spirit/State.h"
 
 #include "data/State.hpp"
-#include <data/Spin_System.hpp>
-#include <data/Spin_System_Chain.hpp>
+#include "data/Spin_System.hpp"
+#include "data/Spin_System_Chain.hpp"
 #include "Spirit/Hamiltonian.h"
 #include "Spirit/Chain.h"
 #include "Spirit/Configurations.h"
@@ -90,14 +90,14 @@ int main(int argc, char ** argv)
     for (int k = 0; k < image->geometry->n_cells[2]; k++) {
         for (int j = 0; j < image->geometry->n_cells[1]; j++) {
             for (int i = 0; i < image->geometry->n_cells[0]; i++) {
-                regions[i + j * image->geometry->n_cells[0] + k * image->geometry->n_cells[0] * image->geometry->n_cells[1]] = 1;//will set all spins to 1 - frozen.
+                regions[i + j * image->geometry->n_cells[0] + k * image->geometry->n_cells[0] * image->geometry->n_cells[1]] = 1;//will set all spins regions to 1
             }
         }
     }
     //for (int k = 5; k < image->geometry->n_cells[2]-5; k++) {
     for (int j = 5; j < image->geometry->n_cells[1]-5; j++) {
         for (int i = 5; i < image->geometry->n_cells[0]-5; i++) {
-            regions[i+j* image->geometry->n_cells[0]+0* image->geometry->n_cells[0]* image->geometry->n_cells[1]] = 0;//will set inner spins to 0 - free.
+            regions[i+j* image->geometry->n_cells[0]+0* image->geometry->n_cells[0]* image->geometry->n_cells[1]] = 0;//will set inner spins to 0
         }
     }
     Hamiltonian_Set_Regions(state.get(), regions.data());

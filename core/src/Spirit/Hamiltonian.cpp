@@ -20,118 +20,119 @@ using namespace Utility;
 /*---------------------------------- Set Parameters ---------------------------------------------------- */
 /*------------------------------------------------------------------------------------------------------ */
 
-void Hamiltonian_Set_Kind(State *state, Hamiltonian_Type type, int idx_chain) noexcept
-try
+void Hamiltonian_Set_Kind(State* state, Hamiltonian_Type type, int idx_chain) noexcept
 {
-    // TODO
-    if( type != Hamiltonian_Heisenberg && type != Hamiltonian_Micromagnetic && type != Hamiltonian_Gaussian )
+    try
     {
-        Log( Utility::Log_Level::Error, Utility::Log_Sender::API, fmt::format(
-            "Hamiltonian_Set_Kind: unknown type index {}", int(type)), -1, idx_chain );
-        return;
-    }
-
-    std::shared_ptr<Data::Spin_System> image;
-    std::shared_ptr<Data::Spin_System_Chain> chain;
-
-    // Fetch correct indices and pointers
-    int idx_image = -1;
-    from_indices( state, idx_image, idx_chain, image, chain );
-
-    idx_image = 0;
-    std::string kind_str = "";
-    if( type == Hamiltonian_Heisenberg )
-    {
-        kind_str = "Heisenberg";
-
-        if( kind_str == image->hamiltonian->Name() )
+        // TODO
+        if (type != Hamiltonian_Heisenberg && type != Hamiltonian_Micromagnetic && type != Hamiltonian_Gaussian)
         {
-            Log( Utility::Log_Level::Warning, Utility::Log_Sender::API, fmt::format(
-                "Hamiltonian is already of {} kind. Not doing anything.", kind_str), -1, idx_chain );
-            return;
-        }
-    }
-    else if( type == Hamiltonian_Micromagnetic )
-    {
-        kind_str = "Micromagnetic";
-
-        if( kind_str == image->hamiltonian->Name() )
-        {
-            Log( Utility::Log_Level::Warning, Utility::Log_Sender::API, fmt::format(
-                "Hamiltonian is already of {} kind. Not doing anything.", kind_str), -1, idx_chain );
-            return;
-        }
-    }
-    else if( type == Hamiltonian_Gaussian )
-    {
-        kind_str = "Gaussian";
-
-        if( kind_str == image->hamiltonian->Name() )
-        {
-            Log( Utility::Log_Level::Warning, Utility::Log_Sender::API, fmt::format(
-                "Hamiltonian is already of {} kind. Not doing anything.", kind_str), -1, idx_chain );
+            Log(Utility::Log_Level::Error, Utility::Log_Sender::API, fmt::format(
+                "Hamiltonian_Set_Kind: unknown type index {}", int(type)), -1, idx_chain);
             return;
         }
 
-        Log( Utility::Log_Level::Error, Utility::Log_Sender::API, fmt::format(
-            "Cannot yet set Hamiltonian kind to {} - this function is only a stub!", kind_str), -1, idx_chain );
-        return;
-    }
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
 
-    for( auto& image : chain->images )
+        // Fetch correct indices and pointers
+        int idx_image = -1;
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        idx_image = 0;
+        std::string kind_str = "";
+        if (type == Hamiltonian_Heisenberg)
+        {
+            kind_str = "Heisenberg";
+
+            if (kind_str == image->hamiltonian->Name())
+            {
+                Log(Utility::Log_Level::Warning, Utility::Log_Sender::API, fmt::format(
+                    "Hamiltonian is already of {} kind. Not doing anything.", kind_str), -1, idx_chain);
+                return;
+            }
+        }
+        else if (type == Hamiltonian_Micromagnetic)
+        {
+            kind_str = "Micromagnetic";
+
+            if (kind_str == image->hamiltonian->Name())
+            {
+                Log(Utility::Log_Level::Warning, Utility::Log_Sender::API, fmt::format(
+                    "Hamiltonian is already of {} kind. Not doing anything.", kind_str), -1, idx_chain);
+                return;
+            }
+        }
+        else if (type == Hamiltonian_Gaussian)
+        {
+            kind_str = "Gaussian";
+
+            if (kind_str == image->hamiltonian->Name())
+            {
+                Log(Utility::Log_Level::Warning, Utility::Log_Sender::API, fmt::format(
+                    "Hamiltonian is already of {} kind. Not doing anything.", kind_str), -1, idx_chain);
+                return;
+            }
+
+            Log(Utility::Log_Level::Error, Utility::Log_Sender::API, fmt::format(
+                "Cannot yet set Hamiltonian kind to {} - this function is only a stub!", kind_str), -1, idx_chain);
+            return;
+        }
+
+        for (auto& image : chain->images)
+        {
+            image->Lock();
+            try
+            {
+                if (type == Hamiltonian_Heisenberg)
+                {
+                    // TODO: are these the desired defaults?
+                    image->hamiltonian = std::shared_ptr<Engine::Hamiltonian>(new Engine::Hamiltonian_Heisenberg(
+                        0, Vector3{ 0, 0, 1 },
+                        {}, {}, {},
+                        {}, {}, SPIRIT_CHIRALITY_NEEL, Engine::DDI_Method::None,
+                        { 0, 0, 0 }, 0, {}, {},
+                        image->geometry,
+                        image->hamiltonian->boundary_conditions));
+                }
+                else if (type == Hamiltonian_Micromagnetic)
+                {
+                    // TODO: are these the desired defaults?
+                    /*
+                    image->hamiltonian = std::shared_ptr<Engine::Hamiltonian>(new Engine::Hamiltonian_Micromagnetic(
+                        0, Vector3{0, 0, 1},
+                        1, scalarfield(1,0),vectorfield(1, Vector3{0,0,1}),
+                        0,
+                        0,
+                        image->geometry,
+                        2,
+                        image->hamiltonian->boundary_conditions,
+                        Vector3{5e-11, 5e-11, 5e-10},
+                        8e5
+                        ));*/
+                }
+                else if (type == Hamiltonian_Gaussian)
+                {
+                    // TODO
+                    // image->hamiltonian = std::shared_ptr<...>(new Engine::Hamiltonian_Gaussian(...));
+                }
+            }
+            catch (...)
+            {
+                spirit_handle_exception_api(idx_image, idx_chain);
+            }
+            image->Unlock();
+            ++idx_image;
+        }
+
+        Log(Utility::Log_Level::All, Utility::Log_Sender::API, fmt::format(
+            "Set Hamiltonian kind to {}", kind_str), -1, idx_chain);
+    }
+    catch (...)
     {
-        image->Lock();
-        try
-        {
-            if( type == Hamiltonian_Heisenberg )
-            {
-                // TODO: are these the desired defaults?
-                image->hamiltonian = std::shared_ptr<Engine::Hamiltonian>(new Engine::Hamiltonian_Heisenberg(
-                    0, Vector3{0, 0, 1},
-                    {}, {}, {},
-                    {}, {}, SPIRIT_CHIRALITY_NEEL, Engine::DDI_Method::None,
-                    {0, 0, 0}, 0, {}, {},
-                    image->geometry,
-                    image->hamiltonian->boundary_conditions));
-            }
-            else if( type == Hamiltonian_Micromagnetic )
-            {
-                // TODO: are these the desired defaults?
-            	/*
-                image->hamiltonian = std::shared_ptr<Engine::Hamiltonian>(new Engine::Hamiltonian_Micromagnetic(
-                    0, Vector3{0, 0, 1},
-                    1, scalarfield(1,0),vectorfield(1, Vector3{0,0,1}),
-                    0,
-                    0,
-                    image->geometry,
-                    2,
-                    image->hamiltonian->boundary_conditions,
-                	Vector3{5e-11, 5e-11, 5e-10},
-                	8e5
-                	));*/
-            }
-            else if( type == Hamiltonian_Gaussian )
-            {
-                // TODO
-                // image->hamiltonian = std::shared_ptr<...>(new Engine::Hamiltonian_Gaussian(...));
-            }
-        }
-        catch( ... )
-        {
-            spirit_handle_exception_api(idx_image, idx_chain);
-        }
-        image->Unlock();
-        ++idx_image;
+        spirit_handle_exception_api(-1, idx_chain);
     }
-
-    Log( Utility::Log_Level::All, Utility::Log_Sender::API, fmt::format(
-        "Set Hamiltonian kind to {}", kind_str), -1, idx_chain );
 }
-catch( ... )
-{
-    spirit_handle_exception_api(-1, idx_chain);
-}
-
 void Hamiltonian_Set_Boundary_Conditions(State *state, const bool * periodical, int idx_image, int idx_chain) noexcept
 {
     try
@@ -145,9 +146,26 @@ void Hamiltonian_Set_Boundary_Conditions(State *state, const bool * periodical, 
         image->Lock();
         try
         {
-            image->hamiltonian->boundary_conditions[0] = periodical[0];
-            image->hamiltonian->boundary_conditions[1] = periodical[1];
-            image->hamiltonian->boundary_conditions[2] = periodical[2];
+            auto ham = (Engine::Hamiltonian_Micromagnetic*)image->hamiltonian.get();
+            for (uint32_t i = 0; i < ham->region_num; i++) {
+                ham->regions_book[i].periodic[0] = periodical[0];
+                ham->regions_book[i].periodic[1] = periodical[1];
+                ham->regions_book[i].periodic[2] = periodical[2];
+            }
+
+            image->app.launchConfiguration.performZeropadding[0] = !periodical[0];
+            image->app.launchConfiguration.performZeropadding[1] = !periodical[1];
+            image->app.launchConfiguration.performZeropadding[2] = !periodical[2];
+
+            image->app.updateRegionsBook(ham->regions_book, ham->region_num);
+
+            if (image->app.launchConfiguration.DDI) {
+                image->app.free_DDI();
+                image->app.allocate_DDI();
+            }
+
+            image->app.init_solver(image->app.launchConfiguration.solver_type);
+
         }
         catch( ... )
         {
@@ -252,7 +270,7 @@ void Hamiltonian_Set_Ms(State *state, const float Ms, int region_id, int idx_ima
         image->Unlock();
 
         Log( Utility::Log_Level::Info, Utility::Log_Sender::API,
-            fmt::format("Set Ms to {}", Ms),
+            fmt::format("Set region {} Ms to {}", region_id, Ms),
             idx_image, idx_chain );
     }
     catch( ... )
@@ -318,98 +336,100 @@ void Hamiltonian_Set_Field(State *state, float magnitude, const float * normal, 
     }
 }
 void Hamiltonian_Set_Regions(State* state, int* regions, int idx_image, int idx_chain) noexcept
-try
 {
-    std::shared_ptr<Data::Spin_System> image;
-    std::shared_ptr<Data::Spin_System_Chain> chain;
-
-    // Fetch correct indices and pointers
-    from_indices(state, idx_image, idx_chain, image, chain);
-
-    if (image->hamiltonian->Name() != "Heisenberg" && image->hamiltonian->Name() != "Micromagnetic")
-    {
-        Log(Utility::Log_Level::Warning, Utility::Log_Sender::API,
-            "External field cannot be set on " + image->hamiltonian->Name(), idx_image, idx_chain);
-        return;
-    }
-
-    // Lock mutex because simulations may be running
-    image->Lock();
-
     try
     {
-        image->app.updateRegions(regions);
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
+
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        if (image->hamiltonian->Name() != "Heisenberg" && image->hamiltonian->Name() != "Micromagnetic")
+        {
+            Log(Utility::Log_Level::Warning, Utility::Log_Sender::API,
+                "External field cannot be set on " + image->hamiltonian->Name(), idx_image, idx_chain);
+            return;
+        }
+
+        // Lock mutex because simulations may be running
+        image->Lock();
+
+        try
+        {
+            image->app.updateRegions(regions);
+        }
+        catch (...)
+        {
+            spirit_handle_exception_api(idx_image, idx_chain);
+        }
+
+        // Unlock mutex
+        image->Unlock();
+
+        Log(Utility::Log_Level::Info, Utility::Log_Sender::API,
+            fmt::format("Set regions to user-defined"),
+            idx_image, idx_chain);
     }
     catch (...)
     {
         spirit_handle_exception_api(idx_image, idx_chain);
     }
-
-    // Unlock mutex
-    image->Unlock();
-
-    Log(Utility::Log_Level::Info, Utility::Log_Sender::API,
-        fmt::format("Set regions to user-defined"),
-        idx_image, idx_chain);
 }
-catch (...)
+void Hamiltonian_Set_Field_Regions(State* state, float magnitude, const float* normal, int region_id, int idx_image, int idx_chain) noexcept
 {
-    spirit_handle_exception_api(idx_image, idx_chain);
-}
-void Hamiltonian_Set_Field_Regions(State *state, float magnitude, const float * normal, int region_id, int idx_image, int idx_chain) noexcept
-try
-{
-    std::shared_ptr<Data::Spin_System> image;
-    std::shared_ptr<Data::Spin_System_Chain> chain;
-
-    // Fetch correct indices and pointers
-    from_indices( state, idx_image, idx_chain, image, chain );
-
-    if( image->hamiltonian->Name() != "Heisenberg" && image->hamiltonian->Name() != "Micromagnetic" )
-    {
-        Log( Utility::Log_Level::Warning, Utility::Log_Sender::API,
-            "External field cannot be set on " + image->hamiltonian->Name(), idx_image, idx_chain );
-        return;
-    }
-
-    // Lock mutex because simulations may be running
-    image->Lock();
-
     try
     {
-		auto ham = (Engine::Hamiltonian_Micromagnetic*)image->hamiltonian.get();
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
 
-		// Normals
-		Vector3 new_normal{normal[0], normal[1], normal[2]};
-		new_normal.normalize();
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
 
-		// Into the Hamiltonian
-		ham->regions_book[region_id].external_field_magnitude = magnitude;
-		ham->regions_book[region_id].external_field_normal = new_normal;
-        image->app.updateRegionsBook(ham->regions_book, ham->region_num);
-		// Update Energies
-		ham->Update_Energy_Contributions();
+        if (image->hamiltonian->Name() != "Heisenberg" && image->hamiltonian->Name() != "Micromagnetic")
+        {
+            Log(Utility::Log_Level::Warning, Utility::Log_Sender::API,
+                "External field cannot be set on " + image->hamiltonian->Name(), idx_image, idx_chain);
+            return;
+        }
 
+        // Lock mutex because simulations may be running
+        image->Lock();
+
+        try
+        {
+            auto ham = (Engine::Hamiltonian_Micromagnetic*)image->hamiltonian.get();
+
+            // Normals
+            Vector3 new_normal{ normal[0], normal[1], normal[2] };
+            new_normal.normalize();
+
+            // Into the Hamiltonian
+            ham->regions_book[region_id].external_field_magnitude = magnitude;
+            ham->regions_book[region_id].external_field_normal = new_normal;
+            image->app.updateRegionsBook(ham->regions_book, ham->region_num);
+            // Update Energies
+            ham->Update_Energy_Contributions();
+
+        }
+        catch (...)
+        {
+            spirit_handle_exception_api(idx_image, idx_chain);
+        }
+
+        // Unlock mutex
+        image->Unlock();
+
+        Log(Utility::Log_Level::Info, Utility::Log_Sender::API,
+            fmt::format("Set region {} external field to {}, direction ({}, {}, {})", region_id, magnitude, normal[0], normal[1], normal[2]),
+            idx_image, idx_chain);
     }
-    catch( ... )
+    catch (...)
     {
         spirit_handle_exception_api(idx_image, idx_chain);
     }
-
-    // Unlock mutex
-    image->Unlock();
-
-    Log( Utility::Log_Level::Info, Utility::Log_Sender::API,
-        fmt::format("Set external field to {}, direction ({}, {}, {})", magnitude, normal[0], normal[1], normal[2]),
-        idx_image, idx_chain );
 }
-catch( ... )
-{
-    spirit_handle_exception_api(idx_image, idx_chain);
-}
-
-void Hamiltonian_Set_Anisotropy( State *state, float magnitude, const float * normal,
-                                 int idx_image, int idx_chain) noexcept
+void Hamiltonian_Set_Anisotropy( State *state, float magnitude, const float * normal, int idx_image, int idx_chain) noexcept
 {
     try
     {
@@ -470,58 +490,58 @@ void Hamiltonian_Set_Anisotropy( State *state, float magnitude, const float * no
     }
 }
 
-void Hamiltonian_Set_Anisotropy_Regions( State *state, float magnitude, const float * normal, int region_id,
-                                 int idx_image, int idx_chain) noexcept
-try
+void Hamiltonian_Set_Anisotropy_Regions(State* state, float magnitude, const float* normal, int region_id, int idx_image, int idx_chain) noexcept
 {
-    std::shared_ptr<Data::Spin_System> image;
-    std::shared_ptr<Data::Spin_System_Chain> chain;
-
-    // Fetch correct indices and pointers
-    from_indices( state, idx_image, idx_chain, image, chain );
-
-    image->Lock();
-
     try
     {
-		auto ham = (Engine::Hamiltonian_Micromagnetic*)image->hamiltonian.get();
-		int nos = image->nos;
-		int n_cell_atoms = image->geometry->n_cell_atoms;
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
 
-		// Indices and Magnitudes
-		scalarfield new_magnitudes(1);
-		new_magnitudes[0] = magnitude;
-		// Normals
-		Vector3 new_normal{ normal[0], normal[1], normal[2] };
-		new_normal.normalize();
-		//vectorfield new_normals(1, new_normal);
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
 
-		// Into the Hamiltonian
-		ham->regions_book[region_id].n_anisotropies = 1;
-		ham->regions_book[region_id].anisotropy_magnitudes[0] = new_magnitudes[0];
-		ham->regions_book[region_id].anisotropy_normals[0] = new_normal;
-        image->app.updateRegionsBook(ham->regions_book, ham->region_num);
-		// Update Energies
-		ham->Update_Energy_Contributions();
+        image->Lock();
 
-		Log( Utility::Log_Level::Info, Utility::Log_Sender::API,
-			fmt::format("Set anisotropy to {}, direction ({}, {}, {})", magnitude, new_normal[0], new_normal[1], new_normal[2]),
-			idx_image, idx_chain );
+        try
+        {
+            auto ham = (Engine::Hamiltonian_Micromagnetic*)image->hamiltonian.get();
+            int nos = image->nos;
+            int n_cell_atoms = image->geometry->n_cell_atoms;
+
+            // Indices and Magnitudes
+            scalarfield new_magnitudes(1);
+            new_magnitudes[0] = magnitude;
+            // Normals
+            Vector3 new_normal{ normal[0], normal[1], normal[2] };
+            new_normal.normalize();
+            //vectorfield new_normals(1, new_normal);
+
+            // Into the Hamiltonian
+            ham->regions_book[region_id].n_anisotropies = 1;
+            ham->regions_book[region_id].anisotropy_magnitudes[0] = new_magnitudes[0];
+            ham->regions_book[region_id].anisotropy_normals[0] = new_normal;
+            image->app.updateRegionsBook(ham->regions_book, ham->region_num);
+            // Update Energies
+            ham->Update_Energy_Contributions();
+
+            Log(Utility::Log_Level::Info, Utility::Log_Sender::API,
+                fmt::format("Set region {} anisotropy to {}, direction ({}, {}, {})", region_id, magnitude, new_normal[0], new_normal[1], new_normal[2]),
+                idx_image, idx_chain);
 
 
+        }
+        catch (...)
+        {
+            spirit_handle_exception_api(idx_image, idx_chain);
+        }
+
+        image->Unlock();
     }
-    catch( ... )
+    catch (...)
     {
         spirit_handle_exception_api(idx_image, idx_chain);
     }
-
-    image->Unlock();
 }
-catch( ... )
-{
-    spirit_handle_exception_api(idx_image, idx_chain);
-}
-
 void Hamiltonian_Set_Exchange(State *state, int n_shells, const float* jij, int idx_image, int idx_chain) noexcept
 {
     try
@@ -584,12 +604,14 @@ void Hamiltonian_Set_Exchange_Tensor(State *state, float exchange_tensor, int re
             {
                 // Update the Hamiltonian
                 auto ham = (Engine::Hamiltonian_Micromagnetic*)image->hamiltonian.get();
+                std::string message;
+                
                 ham->regions_book[region_id].Aexch = exchange_tensor;
+                message = fmt::format("Set region {} exchange to {}", region_id, exchange_tensor);
+
                 image->app.updateRegionsBook(ham->regions_book, ham->region_num);
                 ham->Update_Interactions();
 
-                std::string message = fmt::format("Set exchange tensor:\n");
-                message += fmt::format("{}\n", exchange_tensor);
                 //message += fmt::format("{} {} {}\n", exchange_tensor[3],exchange_tensor[4],exchange_tensor[5]);
                 //message += fmt::format("{} {} {}", exchange_tensor[6],exchange_tensor[7],exchange_tensor[8]);
                 Log(Utility::Log_Level::Info, Utility::Log_Sender::API, message, idx_image, idx_chain);
@@ -666,7 +688,7 @@ void Hamiltonian_Set_DMI(State *state, int n_shells, const float * dij, int chir
     }
 }
 
-void Hamiltonian_Set_DMI_Tensor(State *state, float dmi_tensor, int region_id, int idx_image, int idx_chain) noexcept
+void Hamiltonian_Set_DMI_Tensor(State *state, float dmi_tensor[2], int region_id, int idx_image, int idx_chain) noexcept
 {
     try
     {
@@ -684,12 +706,16 @@ void Hamiltonian_Set_DMI_Tensor(State *state, float dmi_tensor, int region_id, i
             {
                 // Update the Hamiltonian
                 auto ham = (Engine::Hamiltonian_Micromagnetic*)image->hamiltonian.get();
-                ham->regions_book[region_id].Dmi_bulk = dmi_tensor;
+                std::string message; 
+               
+                ham->regions_book[region_id].Dmi_bulk = dmi_tensor[0];
+                ham->regions_book[region_id].Dmi_interface = dmi_tensor[1];
+                message = fmt::format("Set region {} DMI: bulk={} interface={}", region_id, dmi_tensor[0], dmi_tensor[1]);
+
                 image->app.updateRegionsBook(ham->regions_book, ham->region_num);
                 ham->Update_Interactions();
 
-                std::string message = fmt::format("Set DMI)bulk tensor:\n");
-                message += fmt::format("{}\n", dmi_tensor);
+                
                 //message += fmt::format("{} {} {}\n", dmi_tensor[3],dmi_tensor[4],dmi_tensor[5]);
                 //message += fmt::format("{} {} {}", dmi_tensor[6],dmi_tensor[7],dmi_tensor[8]);
                 Log(Utility::Log_Level::Info, Utility::Log_Sender::API, message, idx_image, idx_chain);
@@ -710,7 +736,7 @@ void Hamiltonian_Set_DMI_Tensor(State *state, float dmi_tensor, int region_id, i
         spirit_handle_exception_api(idx_image, idx_chain);
     }
 }
-void Hamiltonian_Set_DDI(State *state, int ddi_method, int n_periodic_images[3], float cutoff_radius, int idx_image, int idx_chain) noexcept
+void Hamiltonian_Set_DDI_coefficient(State* state, float ddi, int region_id, int idx_image, int idx_chain) noexcept
 {
     try
     {
@@ -718,7 +744,115 @@ void Hamiltonian_Set_DDI(State *state, int ddi_method, int n_periodic_images[3],
         std::shared_ptr<Data::Spin_System_Chain> chain;
 
         // Fetch correct indices and pointers
-        from_indices( state, idx_image, idx_chain, image, chain );
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        image->Lock();
+
+        try
+        {
+            if (image->hamiltonian->Name() == "Micromagnetic")
+            {
+                // Update the Hamiltonian
+                std::string message;// 
+                auto ham = (Engine::Hamiltonian_Micromagnetic*)image->hamiltonian.get();
+                if (region_id == -1) {
+                    for (uint32_t i = 0; i < ham->region_num; i++) {
+                        ham->regions_book[i].DDI = 0;
+                    }
+                    image->app.updateRegionsBook(ham->regions_book, ham->region_num);
+                    if (image->app.launchConfiguration.DDI) {
+                        image->app.launchConfiguration.DDI = false;
+                        image->app.free_DDI();
+                        image->app.init_solver(image->app.launchConfiguration.solver_type);
+                    }
+                    message = fmt::format("Set all regions DDI strength to {}", 0);
+                }
+                else {
+                    ham->regions_book[region_id].DDI = ddi;
+                    image->app.updateRegionsBook(ham->regions_book, ham->region_num);
+                    if (!image->app.launchConfiguration.DDI) {
+                        image->app.launchConfiguration.DDI = true;
+                        image->app.allocate_DDI();
+                        image->app.init_solver(image->app.launchConfiguration.solver_type);
+                    }
+                    message = fmt::format("Set region {} DDI strength to {}", region_id, ddi);
+
+                }
+                ham->Update_Interactions();
+
+                //message += fmt::format("{} {} {}\n", dmi_tensor[3],dmi_tensor[4],dmi_tensor[5]);
+                //message += fmt::format("{} {} {}", dmi_tensor[6],dmi_tensor[7],dmi_tensor[8]);
+                Log(Utility::Log_Level::Info, Utility::Log_Sender::API, message, idx_image, idx_chain);
+            }
+            else
+                Log(Utility::Log_Level::Warning, Utility::Log_Sender::API,
+                    "Exchange cannot be set on " + image->hamiltonian->Name(), idx_image, idx_chain);
+        }
+        catch (...)
+        {
+            spirit_handle_exception_api(idx_image, idx_chain);
+        }
+
+        image->Unlock();
+    }
+    catch (...)
+    {
+        spirit_handle_exception_api(idx_image, idx_chain);
+    }
+}
+void Hamiltonian_Set_frozen_spins(State* state, float frozen_spins, int region_id, int idx_image, int idx_chain) noexcept
+{
+    try
+    {
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
+
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        image->Lock();
+
+        try
+        {
+            if (image->hamiltonian->Name() == "Micromagnetic")
+            {
+                // Update the Hamiltonian
+                auto ham = (Engine::Hamiltonian_Micromagnetic*)image->hamiltonian.get();
+                ham->regions_book[region_id].frozen_spins = frozen_spins;
+                image->app.updateRegionsBook(ham->regions_book, ham->region_num);
+                ham->Update_Interactions();
+
+                std::string message = fmt::format("Region {} is frozen", region_id);
+                //message += fmt::format("{} {} {}\n", dmi_tensor[3],dmi_tensor[4],dmi_tensor[5]);
+                //message += fmt::format("{} {} {}", dmi_tensor[6],dmi_tensor[7],dmi_tensor[8]);
+                Log(Utility::Log_Level::Info, Utility::Log_Sender::API, message, idx_image, idx_chain);
+            }
+            else
+                Log(Utility::Log_Level::Warning, Utility::Log_Sender::API,
+                    "Exchange cannot be set on " + image->hamiltonian->Name(), idx_image, idx_chain);
+        }
+        catch (...)
+        {
+            spirit_handle_exception_api(idx_image, idx_chain);
+        }
+
+        image->Unlock();
+    }
+    catch (...)
+    {
+        spirit_handle_exception_api(idx_image, idx_chain);
+    }
+}
+
+void Hamiltonian_Set_DDI(State* state, int ddi_method, int n_periodic_images[3], float cutoff_radius, int idx_image, int idx_chain) noexcept
+{
+    try
+    {
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
+
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
         image->Lock();
 
         try
@@ -734,27 +868,26 @@ void Hamiltonian_Set_DDI(State *state, int ddi_method, int n_periodic_images[3],
                 ham->ddi_cutoff_radius = cutoff_radius;
                 ham->Update_Interactions();
 
-                Log( Utility::Log_Level::Info, Utility::Log_Sender::API, fmt::format(
+                Log(Utility::Log_Level::Info, Utility::Log_Sender::API, fmt::format(
                     "Set ddi to method {}, periodic images {} {} {} and cutoff radius {}",
-                    ddi_method, n_periodic_images[0], n_periodic_images[1], n_periodic_images[2], cutoff_radius), idx_image, idx_chain );
+                    ddi_method, n_periodic_images[0], n_periodic_images[1], n_periodic_images[2], cutoff_radius), idx_image, idx_chain);
             }
             else
-                Log( Utility::Log_Level::Warning, Utility::Log_Sender::API, "DDI cannot be set on " +
-                        image->hamiltonian->Name(), idx_image, idx_chain );
+                Log(Utility::Log_Level::Warning, Utility::Log_Sender::API, "DDI cannot be set on " +
+                    image->hamiltonian->Name(), idx_image, idx_chain);
         }
-        catch( ... )
+        catch (...)
         {
             spirit_handle_exception_api(idx_image, idx_chain);
         }
 
         image->Unlock();
     }
-    catch( ... )
+    catch (...)
     {
         spirit_handle_exception_api(idx_image, idx_chain);
     }
 }
-
 /*------------------------------------------------------------------------------------------------------ */
 /*---------------------------------- Get Parameters ---------------------------------------------------- */
 /*------------------------------------------------------------------------------------------------------ */
@@ -806,10 +939,10 @@ void Hamiltonian_Get_Boundary_Conditions(State *state, bool * periodical, int id
 
         // Fetch correct indices and pointers
         from_indices( state, idx_image, idx_chain, image, chain );
-
-        periodical[0] = image->hamiltonian->boundary_conditions[0];
-        periodical[1] = image->hamiltonian->boundary_conditions[1];
-        periodical[2] = image->hamiltonian->boundary_conditions[2];
+        auto ham = (Engine::Hamiltonian_Micromagnetic*)image->hamiltonian.get();
+        periodical[0] = ham->regions_book[0].periodic[0];
+        periodical[1] = ham->regions_book[0].periodic[1];
+        periodical[2] = ham->regions_book[0].periodic[2];
     }
     catch( ... )
     {
@@ -1166,10 +1299,58 @@ void Hamiltonian_Get_DMI_Tensor(State *state, float * dmi_tensor, int region_id,
         {
             auto ham = (Engine::Hamiltonian_Micromagnetic*)image->hamiltonian.get();
 
-            *dmi_tensor=ham->regions_book[region_id].Dmi_bulk;
+            dmi_tensor[0]=ham->regions_book[region_id].Dmi_bulk;
+            dmi_tensor[1] = ham->regions_book[region_id].Dmi_interface;
         }
     }
     catch( ... )
+    {
+        spirit_handle_exception_api(idx_image, idx_chain);
+    }
+}
+
+void Hamiltonian_Get_DDI_coefficient(State* state, float* ddi, int region_id, int idx_image, int idx_chain) noexcept
+{
+    try
+    {
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
+
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        if (image->hamiltonian->Name() == "Micromagnetic")
+        {
+            auto ham = (Engine::Hamiltonian_Micromagnetic*)image->hamiltonian.get();
+
+            ddi[0] = ham->regions_book[region_id].DDI;
+            ddi[1] = image->app.launchConfiguration.DDI;
+        }
+    }
+    catch (...)
+    {
+        spirit_handle_exception_api(idx_image, idx_chain);
+    }
+}
+
+void Hamiltonian_Get_frozen_spins(State* state, float* frozen_spins, int region_id, int idx_image, int idx_chain) noexcept
+{
+    try
+    {
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
+
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        if (image->hamiltonian->Name() == "Micromagnetic")
+        {
+            auto ham = (Engine::Hamiltonian_Micromagnetic*)image->hamiltonian.get();
+
+            frozen_spins[0] = ham->regions_book[region_id].frozen_spins;
+        }
+    }
+    catch (...)
     {
         spirit_handle_exception_api(idx_image, idx_chain);
     }

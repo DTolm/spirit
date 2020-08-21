@@ -1586,9 +1586,11 @@ namespace IO
                     regions_book[i].frozen_spins=0;
                 }
             }
+            myfile.Read_Single(launchConfiguration.kernel_accuracy, "kernel_accuracy");
             // Precision of the spatial gradient calculation
             myfile.Read_Single(spatial_gradient_order, "spatial_gradient_order");
             myfile.Read_Single(launchConfiguration.max_move, "max_move");
+
             launchConfiguration.max_move = 3.14159265358979 / launchConfiguration.max_move;
             myfile.Read_Single(launchConfiguration.n_lbfgs_memory, "n_lbfgs");
             // Field

@@ -123,18 +123,16 @@ void Method_Solver<Solver::VP_OSO>::Iteration ()
         this->systems[0]->app.getEnergy(energy, &meanMag, &max_Force, &time);
         energy[0] *= 2;
         for (int i = 0; i < 5; i++) {
-            energy[i] *= 1.0 * this->systems[0]->geometry->nos / (this->systems[0]->geometry->nos - 900352);
             energy_full += energy[i];
             this->systems[0]->hamiltonian->energy_array[i].second = energy[i];
         }
         //this->systems[0]->hamiltonian->energy_contributions_per_spin[0].second[0] = energy_full;
         //this->systems[0]->M = meanMag / this->systems[0]->geometry->nos;
-        this->systems[0]->M = meanMag / (this->systems[0]->geometry->nos - 900352);
+        this->systems[0]->M = meanMag / (this->systems[0]->geometry->nos);
         //scalar max_Force =this->systems[0]->app.getMaxForce();
         this->force_max_abs_component = sqrt(max_Force);
 
-        std::cout << "Efull: " << energy_full / this->systems[0]->geometry->nos << " Ezeeman: " << energy[0] / this->systems[0]->geometry->nos << " Eanis: " << energy[1] / this->systems[0]->geometry->nos << " Eexch: " << energy[2] / this->systems[0]->geometry->nos << " Edmi: " << energy[3] / this->systems[0]->geometry->nos << " Eddi: " << energy[4] / this->systems[0]->geometry->nos << "\n";
-        std::cout << "maxForce: " << max_Force << " Mx: " << this->systems[0]->M[0] << " My: " << this->systems[0]->M[1] << " Mz: " << this->systems[0]->M[2] << "\n";
+        std::cout << "iteration: " << iterations << " maxTorque: " << this->force_max_abs_component << " Mx: " << this->systems[0]->M[0] << " My: " << this->systems[0]->M[1] << " Mz: " << this->systems[0]->M[2] << " Efull: " << energy_full / this->systems[0]->geometry->nos << " Ezeeman: " << energy[0] / this->systems[0]->geometry->nos << " Eanis: " << energy[1] / this->systems[0]->geometry->nos << " Eexch: " << energy[2] / this->systems[0]->geometry->nos << " Edmi: " << energy[3] / this->systems[0]->geometry->nos << " Eddi: " << energy[4] / this->systems[0]->geometry->nos << "\n";
 
         //this->systems[0]->app.writeGradient((*this->configurations[0]).data());
     }

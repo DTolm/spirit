@@ -33,6 +33,7 @@ glslangvalidator -V ReduceEnergy.comp -o ReduceEnergy.spv --target-env spirv1.3
 glslangvalidator -V ReduceDotFinish.comp -o ReduceDotFinish.spv --target-env spirv1.3
 glslangvalidator -V ReduceDotFinishLBFGS.comp -o ReduceDotFinishLBFGS.spv --target-env spirv1.3
 glslangvalidator -V ReduceMaxFinish.comp -o ReduceMaxFinish.spv --target-env spirv1.3
+glslangvalidator -V ReduceFullDataFinish.comp -o ReduceFullDataFinish.spv --target-env spirv1.3
 glslangvalidator -V gradient_double.comp -o gradient_double.spv --target-env spirv1.3
 glslangvalidator -V gradient_float.comp -o gradient_float.spv --target-env spirv1.3
 glslangvalidator -V oso_calc_gradients.comp -o oso_calc_gradients.spv --target-env spirv1.3

@@ -110,7 +110,11 @@ PREFIX void Hamiltonian_Set_DMI(State *state, int n_shells, const float * dij, i
 PREFIX void Hamiltonian_Set_Exchange_Tensor(State *state, float exchange_tensor, int region_id, int idx_image=-1, int idx_chain=-1) SUFFIX;
 
 // Set the Dzyaloshinskii-Moriya interaction tensor for micromagnetics [meV]
-PREFIX void Hamiltonian_Set_DMI_Tensor(State *state, float dmi_tensor, int region_id, int idx_image=-1, int idx_chain=-1) SUFFIX;
+PREFIX void Hamiltonian_Set_DMI_Tensor(State *state, float dmi_tensor[2], int region_id, int idx_image=-1, int idx_chain=-1) SUFFIX;
+// Set the frozen spins
+PREFIX void Hamiltonian_Set_frozen_spins(State* state, float frozen_spins, int region_id, int idx_image = -1, int idx_chain = -1) SUFFIX;
+
+PREFIX void Hamiltonian_Set_DDI_coefficient(State* state, float ddi, int region_id, int idx_image = -1, int idx_chain = -1) SUFFIX;
 /*
 Configure the dipole-dipole interaction
 
@@ -175,7 +179,11 @@ PREFIX void Hamiltonian_Get_DMI_Shells(State *state, int * n_shells, float * dij
 PREFIX int  Hamiltonian_Get_DMI_N_Pairs(State *state, int idx_image=-1, int idx_chain=-1) SUFFIX;
 
 //Micromagnetics DMI tensor
-PREFIX void Hamiltonian_Get_DMI_Tensor(State *state, float *exchange_tensor, int region_id, int idx_image=-1, int idx_chain=-1) SUFFIX;
+PREFIX void Hamiltonian_Get_DMI_Tensor(State *state, float * dmi_tensor, int region_id, int idx_image=-1, int idx_chain=-1) SUFFIX;
+//Micromagnetics DDI coefficient
+PREFIX void Hamiltonian_Get_DDI_coefficient(State* state, float* ddi, int region_id, int idx_image = -1, int idx_chain = -1) SUFFIX;
+//Micromagnetics frozen spins
+PREFIX void Hamiltonian_Get_frozen_spins(State* state, float* frozen_spins, int region_id, int idx_image = -1, int idx_chain = -1) SUFFIX;
 /*
 Retrieves the dipole-dipole interaction configuration.
 
