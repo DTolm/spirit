@@ -155,7 +155,10 @@ void Method_Solver<Solver::LBFGS_OSO>::Iteration()
         //this->systems[0]->hamiltonian->energy_contributions_per_spin[0].second[0] = energy_full;
         this->systems[0]->M = meanMag/ (this->systems[0]->geometry->nos);
         //scalar max_Force =this->systems[0]->app.getMaxForce();
+        //if (this->force_max_abs_component == sqrt(max_Force))  this->systems[0]->iteration_allowed = false;
+
         this->force_max_abs_component = sqrt(max_Force);
+        if  (this->force_max_abs_component < this->systems[0]->app.launchConfiguration.maxTorque) this->systems[0]->iteration_allowed = false;
         //std::cout << "maxTorque: " << this->force_max_abs_component<<" Mx: " << this->systems[0]->M[0] << " My: " << this->systems[0]->M[1] << " Mz: " << this->systems[0]->M[2] << " m_sum: " << this->systems[0]->M[0]+ this->systems[0]->M[1]+this->systems[0]->M[2] <<" Efull: " << energy_full / this->systems[0]->geometry->nos << " Ezeeman: " << energy[0] / this->systems[0]->geometry->nos << " Eanis: " << energy[1] / this->systems[0]->geometry->nos << " Eexch: " << energy[2] / this->systems[0]->geometry->nos << " Edmi: " << energy[3] / this->systems[0]->geometry->nos << " Eddi: " << energy[4] / this->systems[0]->geometry->nos << "\n";
         /*if (iterations == 0) {
             std::ofstream outfile;

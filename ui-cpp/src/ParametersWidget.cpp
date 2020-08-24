@@ -64,10 +64,21 @@ void ParametersWidget::Load_Parameters_Contents()
     int image_type;
     int i1, i2;
     bool b1, b2, b3, b4, b5;
-
+    Parameters_LLG_Get_dt(this->state.get(), &d);
+    this->lineEdit_dt->setText(QString::number(d));
+    Parameters_LLG_Get_max_torque(this->state.get(), &d);
+    this->lineEdit_max_torque->setText(QString::number(d));
+    Parameters_LLG_Get_max_move(this->state.get(), &d);
+    this->lineEdit_max_move->setText(QString::number(d));
+    Parameters_LLG_Get_n_LBFGS(this->state.get(), &i1);
+    this->lineEdit_n_LBFGS->setText(QString::number(i1));
+    Parameters_LLG_Get_grouped_iterations(this->state.get(), &i1);
+    this->lineEdit_grouped_iterations->setText(QString::number(i1));
+    Parameters_LLG_Get_save_period(this->state.get(), &i1);
+    this->lineEdit_save_period->setText(QString::number(i1));
     //      LLG
     // Direct minimization
-    b1 = Parameters_LLG_Get_Direct_Minimization(state.get());
+    /*b1 = Parameters_LLG_Get_Direct_Minimization(state.get());
     this->checkBox_llg_direct->setChecked(b1);
     // Damping
     d = Parameters_LLG_Get_Damping(state.get());
@@ -94,7 +105,7 @@ void ParametersWidget::Load_Parameters_Contents()
     this->lineEdit_llg_temperature_dir_z->setText(QString::number(vd[2]));
     // Convergence
     d = Parameters_LLG_Get_Convergence(state.get());
-    this->spinBox_llg_convergence->setValue(std::log10(d));
+    this->spinBox_llg_convergence->setValue(std::log10(d));*/
     // Output
     Parameters_LLG_Get_N_Iterations(state.get(), &i1, &i2);
     this->lineEdit_llg_n_iterations->setText(QString::number(i1));
@@ -234,7 +245,7 @@ void ParametersWidget::set_parameters_llg()
         bool b1, b2, b3, b4;
 
         // Direct minimization
-        b1 = this->checkBox_llg_direct->isChecked();
+        /*b1 = this->checkBox_llg_direct->isChecked();
         Parameters_LLG_Set_Direct_Minimization(this->state.get(), b1, idx_image);
 
         // Convergence
@@ -248,11 +259,11 @@ void ParametersWidget::set_parameters_llg()
 
         // Damping
         d = this->lineEdit_Damping->text().toFloat();
-        Parameters_LLG_Set_Damping(this->state.get(), d, idx_image);
+        Parameters_LLG_Set_Damping(this->state.get(), d, idx_image);*/
 
 
         // Spin polarised current
-        b1 = this->radioButton_stt_gradient->isChecked();
+        /*b1 = this->radioButton_stt_gradient->isChecked();
         if (this->checkBox_llg_stt->isChecked())
             d = this->doubleSpinBox_llg_stt_magnitude->value();
         else
@@ -274,11 +285,26 @@ void ParametersWidget::set_parameters_llg()
                 doubleSpinBox_llg_stt_polarisation_z->setValue(1.0);
             }
             else { throw(ex); }
-        }
-        Parameters_LLG_Set_STT(state.get(), b1, d, vd, idx_image);
+        }*/
+        d = this->lineEdit_dt->text().toFloat();
+        Parameters_LLG_Set_dt(this->state.get(), d, idx_image);
+        d = this->lineEdit_max_torque->text().toFloat();
+        Parameters_LLG_Set_max_torque(this->state.get(), d, idx_image);
+        d = this->lineEdit_max_move->text().toFloat();
+        Parameters_LLG_Set_max_move(this->state.get(), d, idx_image);
+        i1 = this->lineEdit_n_LBFGS->text().toInt();
+        Parameters_LLG_Set_n_LBFGS(this->state.get(), i1, idx_image);
+        i1 = this->lineEdit_grouped_iterations->text().toInt();
+        Parameters_LLG_Set_grouped_iterations(this->state.get(), i1, idx_image);
+        i1 = this->lineEdit_save_period->text().toInt();
+        Parameters_LLG_Set_save_period(this->state.get(), i1, idx_image);
+
+
+
+        //Parameters_LLG_Set_STT(state.get(), b1, d, vd, idx_image);
 
         // Temperature
-        if (this->checkBox_llg_temperature->isChecked())
+        /*if (this->checkBox_llg_temperature->isChecked())
         {
             d = this->doubleSpinBox_llg_temperature->value();
             d2 = this->lineEdit_llg_temperature_inclination->text().toFloat();
@@ -293,9 +319,9 @@ void ParametersWidget::set_parameters_llg()
             vd[0] = 0;
             vd[1] = 0;
             vd[2] = 0;
-        }
-        Parameters_LLG_Set_Temperature(state.get(), d, idx_image);
-        Parameters_LLG_Set_Temperature_Gradient(state.get(), d2, vd, idx_image);
+        }*/
+        /*Parameters_LLG_Set_Temperature(state.get(), d, idx_image);
+        Parameters_LLG_Set_Temperature_Gradient(state.get(), d2, vd, idx_image);*/
 
         // Output
         i1 = this->lineEdit_llg_n_iterations->text().toInt();
@@ -583,7 +609,7 @@ void ParametersWidget::Setup_Parameters_Slots()
 {
     //      LLG
     // Direct minimization
-    connect(this->checkBox_llg_direct, SIGNAL(stateChanged(int)), this, SLOT(set_parameters_llg()));
+    /*connect(this->checkBox_llg_direct, SIGNAL(stateChanged(int)), this, SLOT(set_parameters_llg()));
     // Temperature
     connect(this->checkBox_llg_temperature, SIGNAL(stateChanged(int)), this, SLOT(set_parameters_llg()));
     connect(this->doubleSpinBox_llg_temperature, SIGNAL(editingFinished()), this, SLOT(set_parameters_llg()));
@@ -603,7 +629,7 @@ void ParametersWidget::Setup_Parameters_Slots()
     connect(this->lineEdit_Damping, SIGNAL(returnPressed()), this, SLOT(set_parameters_llg()));
     connect(this->lineEdit_dt, SIGNAL(returnPressed()), this, SLOT(set_parameters_llg()));
     // Convergence criterion
-    connect(this->spinBox_llg_convergence, SIGNAL(editingFinished()), this, SLOT(set_parameters_llg()));
+    connect(this->spinBox_llg_convergence, SIGNAL(editingFinished()), this, SLOT(set_parameters_llg()));*/
     // Output
     connect(this->lineEdit_llg_n_iterations, SIGNAL(returnPressed()), this, SLOT(set_parameters_llg()));
     connect(this->lineEdit_llg_log_steps, SIGNAL(returnPressed()), this, SLOT(set_parameters_llg()));
@@ -617,7 +643,12 @@ void ParametersWidget::Setup_Parameters_Slots()
     connect(this->checkBox_llg_output_energy_divide, SIGNAL(stateChanged(int)), this, SLOT(set_parameters_llg()));
     connect(this->checkBox_llg_output_configuration_step, SIGNAL(stateChanged(int)), this, SLOT(set_parameters_llg()));
     connect(this->checkBox_llg_output_configuration_archive, SIGNAL(stateChanged(int)), this, SLOT(set_parameters_llg()));
-
+    connect(this->lineEdit_dt, SIGNAL(returnPressed()), this, SLOT(set_parameters_llg()));
+    connect(this->lineEdit_max_torque, SIGNAL(returnPressed()), this, SLOT(set_parameters_llg()));
+    connect(this->lineEdit_max_move, SIGNAL(returnPressed()), this, SLOT(set_parameters_llg()));
+    connect(this->lineEdit_n_LBFGS, SIGNAL(returnPressed()), this, SLOT(set_parameters_llg()));
+    connect(this->lineEdit_grouped_iterations, SIGNAL(returnPressed()), this, SLOT(set_parameters_llg()));
+    connect(this->lineEdit_save_period, SIGNAL(returnPressed()), this, SLOT(set_parameters_llg()));
     //      MC
     // Paramters
     connect(this->checkBox_mc_temperature, SIGNAL(stateChanged(int)), this, SLOT(set_parameters_mc()));
@@ -699,12 +730,12 @@ void ParametersWidget::Setup_Parameters_Slots()
 void ParametersWidget::Setup_Input_Validators()
 {
     //      LLG
-    this->lineEdit_Damping->setValidator(this->number_validator_unsigned);
+    /*this->lineEdit_Damping->setValidator(this->number_validator_unsigned);
     this->lineEdit_dt->setValidator(this->number_validator_unsigned);
     this->lineEdit_llg_temperature_inclination->setValidator(this->number_validator);
     this->lineEdit_llg_temperature_dir_x->setValidator(this->number_validator);
     this->lineEdit_llg_temperature_dir_y->setValidator(this->number_validator);
-    this->lineEdit_llg_temperature_dir_z->setValidator(this->number_validator);
+    this->lineEdit_llg_temperature_dir_z->setValidator(this->number_validator);*/
     //      GNEB
     this->lineEdit_gneb_springconstant->setValidator(this->number_validator_unsigned);
     this->lineEdit_gneb_springforceratio->setValidator(this->number_validator_unsigned);

@@ -77,8 +77,9 @@ int main(int argc, char ** argv)
     // // Set the chain length
     // Chain_Set_Length(state.get(), 12);
 
-    // // First image is plus-z with a Bloch skyrmion at the center
-    Configuration_PlusZ(state.get());
+    // set regions (uncomment below)
+    
+    /*Configuration_PlusZ(state.get());
     std::shared_ptr<Data::Spin_System> image;
     std::shared_ptr<Data::Spin_System_Chain> chain;
 
@@ -90,7 +91,7 @@ int main(int argc, char ** argv)
     for (int k = 0; k < image->geometry->n_cells[2]; k++) {
         for (int j = 0; j < image->geometry->n_cells[1]; j++) {
             for (int i = 0; i < image->geometry->n_cells[0]; i++) {
-                regions[i + j * image->geometry->n_cells[0] + k * image->geometry->n_cells[0] * image->geometry->n_cells[1]] = 1;//will set all spins regions to 1
+                regions[i + j * image->geometry->n_cells[0] + k * image->geometry->n_cells[0] * image->geometry->n_cells[1]] = 0;//will set all spins regions to 1
             }
         }
     }
@@ -100,15 +101,15 @@ int main(int argc, char ** argv)
             regions[i+j* image->geometry->n_cells[0]+0* image->geometry->n_cells[0]* image->geometry->n_cells[1]] = 0;//will set inner spins to 0
         }
     }
-    Hamiltonian_Set_Regions(state.get(), regions.data());
-    // }
+    Hamiltonian_Set_Regions(state.get(), regions.data());*/
 
-     //float dir[3] = { 1,1,1};
-     //Configuration_Domain(state.get(), dir);
+
+     float dir[3] = { 0,1,0};
+     Configuration_Domain(state.get(), dir);
      //Configuration_APStripe(state.get());
 
      //Configuration_Vortex(state.get(), 1000.0, 1.0, 0, false, false, false);
-     Configuration_Skyrmion(state.get(), 150.0, 1.0, 0, false, false, false);
+     //Configuration_Skyrmion(state.get(), 150.0, 1.0, 0, false, false, false);
      //Configuration_Skyrmion(state.get(), 50.0, 1.0, 0, true, false, false);
      //Configuration_Hopfion(state.get(), 40, 1.0);
      //Configuration_SpinSpiral(State * state);//

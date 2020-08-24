@@ -53,7 +53,7 @@ void main() {
 		
 		if (consts.k==consts.num_mem-1){
 			
-			sd[gl_GlobalInvocationID.x]=-sd[gl_GlobalInvocationID.x];
+			//sd[gl_GlobalInvocationID.x]=-sd[gl_GlobalInvocationID.x];
 			grad_pr[gl_GlobalInvocationID.x]=grad[gl_GlobalInvocationID.x];
 		}
 	}	

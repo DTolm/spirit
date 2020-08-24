@@ -39,7 +39,8 @@ namespace Engine
         LBFGS_OSO = Solver_LBFGS_OSO,
         LBFGS_Atlas = Solver_LBFGS_Atlas,
         VP = Solver_VP,
-        VP_OSO = Solver_VP_OSO
+        VP_OSO = Solver_VP_OSO,
+        CG_OSO = Solver_CG_OSO
     };
 
     /*
@@ -358,6 +359,7 @@ namespace Engine
     #include <engine/Solver_RK4.hpp>
     #include <engine/Solver_VP.hpp>
     #include <engine/Solver_VP_OSO.hpp>
+    #include <engine/Solver_CG_OSO.hpp>
     #include <engine/Solver_LBFGS_OSO.hpp>
     #include <engine/Solver_LBFGS_Atlas.hpp>
 }

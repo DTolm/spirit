@@ -7,16 +7,16 @@ layout(binding = 0) readonly buffer Data0
 {
    float grad [];
 };
-layout(binding = 1) writeonly buffer Data2
+layout(binding = 1) buffer Data2
 {
-   float grad_pr [];
+   float sd [];
 };
 layout(binding = 2) buffer Data3
 {
    float s [];
 };
 
-layout(binding = 3) readonly buffer Data4
+layout(binding = 3) buffer Data4
 {
    float reduceResults[];
 };
@@ -25,27 +25,33 @@ layout(push_constant) uniform PushConsts
 {
   uint pad;
   float dt;
-  float m_temp_inv;
 } consts;
 
-
-shared float sdata[sumSubGroupSize];
 void main() {
 	uint id_x=gl_GlobalInvocationID.x;
-	grad_pr[id_x]=grad[id_x];
-	grad_pr[id_x+consts.pad]=grad[id_x+consts.pad];
-	grad_pr[id_x+2*consts.pad]=grad[id_x+2*consts.pad];
+	
 	vec3 s_loc;
 	s_loc.x=s[id_x];
 	s_loc.y=s[id_x+consts.pad];
 	s_loc.z=s[id_x+2*consts.pad];
-	float beta= reduceResults[0]/reduceResults[1];
-	if (beta>0) beta=0;
 	vec3 sd_loc;
-	sd_loc.x=consts.dt*grad[id_x]*(beta - consts.m_temp_inv);
-	sd_loc.y=consts.dt*grad[id_x+consts.pad]*(beta - consts.m_temp_inv);
-	sd_loc.z=consts.dt*grad[id_x+2*consts.pad]*(beta - consts.m_temp_inv);
-	
+	if (reduceResults[1]==0){
+		reduceResults[1]=reduceResults[0];
+		sd_loc.x=-grad[id_x];
+		sd_loc.y=-grad[id_x+consts.pad];
+		sd_loc.z=-grad[id_x+2*consts.pad];	
+	}
+	else{
+		float beta= reduceResults[0]/reduceResults[1];
+		reduceResults[1]=reduceResults[0];
+		sd_loc.x=beta*sd_loc.x-grad[id_x];
+		sd_loc.y=beta*sd_loc.y-grad[id_x+consts.pad];
+		sd_loc.z=beta*sd_loc.z-grad[id_x+2*consts.pad];	
+	}
+	sd_loc*=consts.dt;
+	sd[id_x]=sd_loc.x;
+	sd[id_x+consts.pad]=sd_loc.y;
+	sd[id_x+2*consts.pad]=sd_loc.z;
 	float theta = length(sd_loc);
 	if (theta > 1.0e-20) // if theta is too small we do nothing
 	{

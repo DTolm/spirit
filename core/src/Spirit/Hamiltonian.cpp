@@ -736,6 +736,53 @@ void Hamiltonian_Set_DMI_Tensor(State *state, float dmi_tensor[2], int region_id
         spirit_handle_exception_api(idx_image, idx_chain);
     }
 }
+void Hamiltonian_Set_damping(State* state, float alpha, int region_id, int idx_image, int idx_chain) noexcept
+{
+    try
+    {
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
+
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        image->Lock();
+
+        try
+        {
+            if (image->hamiltonian->Name() == "Micromagnetic")
+            {
+                // Update the Hamiltonian
+                auto ham = (Engine::Hamiltonian_Micromagnetic*)image->hamiltonian.get();
+                std::string message;
+
+                ham->regions_book[region_id].alpha = alpha;
+                message = fmt::format("Set region {} damping = {}", region_id, alpha);
+
+                image->app.updateRegionsBook(ham->regions_book, ham->region_num);
+                ham->Update_Interactions();
+
+
+                //message += fmt::format("{} {} {}\n", dmi_tensor[3],dmi_tensor[4],dmi_tensor[5]);
+                //message += fmt::format("{} {} {}", dmi_tensor[6],dmi_tensor[7],dmi_tensor[8]);
+                Log(Utility::Log_Level::Info, Utility::Log_Sender::API, message, idx_image, idx_chain);
+            }
+            else
+                Log(Utility::Log_Level::Warning, Utility::Log_Sender::API,
+                    "Exchange cannot be set on " + image->hamiltonian->Name(), idx_image, idx_chain);
+        }
+        catch (...)
+        {
+            spirit_handle_exception_api(idx_image, idx_chain);
+        }
+
+        image->Unlock();
+    }
+    catch (...)
+    {
+        spirit_handle_exception_api(idx_image, idx_chain);
+    }
+}
 void Hamiltonian_Set_DDI_coefficient(State* state, float ddi, int region_id, int idx_image, int idx_chain) noexcept
 {
     try
@@ -1308,7 +1355,28 @@ void Hamiltonian_Get_DMI_Tensor(State *state, float * dmi_tensor, int region_id,
         spirit_handle_exception_api(idx_image, idx_chain);
     }
 }
+void Hamiltonian_Get_damping(State* state, float* alpha, int region_id, int idx_image, int idx_chain) noexcept
+{
+    try
+    {
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
 
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        if (image->hamiltonian->Name() == "Micromagnetic")
+        {
+            auto ham = (Engine::Hamiltonian_Micromagnetic*)image->hamiltonian.get();
+
+            alpha[0] = ham->regions_book[region_id].alpha;
+        }
+    }
+    catch (...)
+    {
+        spirit_handle_exception_api(idx_image, idx_chain);
+    }
+}
 void Hamiltonian_Get_DDI_coefficient(State* state, float* ddi, int region_id, int idx_image, int idx_chain) noexcept
 {
     try

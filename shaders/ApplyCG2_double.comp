@@ -1,6 +1,6 @@
 #version 450
-#extension GL_KHR_shader_subgroup_arithmetic : enable
 #extension GL_ARB_gpu_shader_fp64 : enable
+#extension GL_KHR_shader_subgroup_arithmetic : enable
 
 double sina_11(double x)
 {
@@ -34,61 +34,56 @@ double cosa_11(double x)
     //sin(x + PI/2) = cos(x)
     return sina_11(x + 1.57079632679489661923LF);
 }
-layout (local_size_x_id = 1) in;
-layout (constant_id = 2) const int sumSubGroupSize = 64;
-
-layout(binding = 0) buffer Data
+layout (local_size_x = 1024, local_size_y = 1,local_size_z = 1) in;
+layout (constant_id = 1) const int sumSubGroupSize = 64;
+layout(binding = 0) readonly buffer Data0
 {
-   float s [];
+   float grad [];
 };
-layout(binding = 1) buffer Data0
+layout(binding = 1) buffer Data2
 {
    float sd [];
 };
-layout(binding = 2) buffer local_iteration
+layout(binding = 2) buffer Data3
 {
-   uint iteration []; // 0-local_iter;
+   float s [];
 };
-layout(binding = 3) readonly buffer Data1
+
+layout(binding = 3) buffer Data4
 {
    float reduceResults[];
 };
 
-layout(binding = 4) buffer MaxMove
-{
-   float maxmove [];
-};
-layout(binding = 5) buffer Data2
-{
-   float s_copy [];
-};
 layout(push_constant) uniform PushConsts
 {
-  uint num_mem;
-  uint nos;
   uint pad;
-  float eps;
-  uint k;
-  float max_move;
+  float dt;
+
 } consts;
 
-//shared float sdata[sumSubGroupSize];
 void main() {
-
-	double theta_rms=sqrt(reduceResults[0]/consts.nos);
-	double scaling = (theta_rms>maxmove[1]) ? maxmove[1]/theta_rms : 1.0;
 	uint id_x=gl_GlobalInvocationID.x;
+
 	vec3 s_loc;
 	s_loc.x=s[id_x];
 	s_loc.y=s[id_x+consts.pad];
 	s_loc.z=s[id_x+2*consts.pad];
-	s_copy[id_x]=s_loc.x;
-	s_copy[id_x+consts.pad]=s_loc.y;
-	s_copy[id_x+2*consts.pad]=s_loc.z;
+
 	dvec3 sd_loc;
-	sd_loc.x=sd[id_x]*scaling;
-	sd_loc.y=sd[id_x+consts.pad]*scaling;
-	sd_loc.z=sd[id_x+2*consts.pad]*scaling;
+	if (reduceResults[1]==0){
+		reduceResults[1]=reduceResults[0];
+		sd_loc.x=-grad[id_x];
+		sd_loc.y=-grad[id_x+consts.pad];
+		sd_loc.z=-grad[id_x+2*consts.pad];	
+	}
+	else{
+		double beta= reduceResults[0]/reduceResults[1];
+		reduceResults[1]=reduceResults[0];
+		sd_loc.x=beta*sd_loc.x-grad[id_x];
+		sd_loc.y=beta*sd_loc.y-grad[id_x+consts.pad];
+		sd_loc.z=beta*sd_loc.z-grad[id_x+2*consts.pad];	
+	}
+	sd_loc*=consts.dt;
 	sd[id_x]=float(sd_loc.x);
 	sd[id_x+consts.pad]=float(sd_loc.y);
 	sd[id_x+2*consts.pad]=float(sd_loc.z);
@@ -101,49 +96,22 @@ void main() {
 		double x = -sd_loc.x* theta_inv;
 		double y = -sd_loc.y* theta_inv;
 		double z = -sd_loc.z* theta_inv;
-		double s1 = x * y * w;
+		  
+		double s1 = x * z * w;
 		double s2 = x * z * w;
 		double s3 = z * y * w;
-		double sin_theta= sina_11(theta);
+		double sin_theta = sina_11(theta);
 		double p1 = z * sin_theta;
 		double p2 = y * sin_theta;
 		double p3 = x * sin_theta;
 		dvec3 t;
+	
 		t.x = (q + x* x * w) * s_loc.x + (s1 - p1) * s_loc.y + (s2 + p2) * s_loc.z;
 		t.y = (s1 + p1) * s_loc.x + (q + y * y * w) * s_loc.y + (s3 - p3) * s_loc.z;
 		t.z = (s2 - p2) * s_loc.x + (s3 + p3) * s_loc.y + (q + z * z * w) * s_loc.z;
-		s[id_x] =float(t.x);//scaling;//sd[id_x];//t1;
-		s[id_x+consts.pad] = float(t.y);//iteration[gl_WorkGroupID.x];//sd[id_x+consts.pad];// t2;
-		s[id_x+2*consts.pad] =float(t.z);//sd[id_x+consts.pad*2];//t3;
+		t=normalize(t);
+		s[id_x] = float(t.x);
+		s[id_x+consts.pad] = float(t.y);
+		s[id_x+2*consts.pad] = float(t.z);
 	};
-	/*
-	float max = (temp_x*temp_x+temp_y*temp_y+temp_z*temp_z);
-	
-	max = subgroupInclusiveMax(max);
-
-	if (gl_SubgroupInvocationID == gl_SubgroupSize - 1)
-	{
-		sdata[gl_SubgroupID] = max;
-	}
-
-	memoryBarrierShared();
-	barrier();
-
-	if (gl_SubgroupID == 0)
-	{
-		float warpMax = gl_SubgroupInvocationID < gl_NumSubgroups ? sdata[gl_SubgroupInvocationID] : 0;
-		warpMax = subgroupInclusiveMax(warpMax);
-		if (gl_SubgroupInvocationID == 0)
-		{
-			partial_max[gl_WorkGroupID.x] = warpMax;
-		}
-	}
-	barrier();*/
-	if (gl_LocalInvocationID.x==gl_WorkGroupSize.x-1)
-	{
-		iteration[gl_WorkGroupID.x]=iteration[gl_WorkGroupID.x]+1;
-		iteration[gl_WorkGroupID.x+gl_NumWorkGroups.x]=iteration[gl_WorkGroupID.x+gl_NumWorkGroups.x]+1;
-		iteration[gl_WorkGroupID.x+2*gl_NumWorkGroups.x]=iteration[gl_WorkGroupID.x+2*gl_NumWorkGroups.x]+1;
-	}
-
-}
+}	

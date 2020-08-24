@@ -80,7 +80,6 @@ void main() {
 	//if(gl_GlobalInvocationID.x >= WIDTH || gl_GlobalInvocationID.y >= HEIGHT || gl_GlobalInvocationID.z >= DEPTH)
 	//  return;
 	uint pad= n;
-	
 	uint x = gl_GlobalInvocationID.x;
 	uint y = gl_GlobalInvocationID.y;
 	uint z = gl_GlobalInvocationID.z;
@@ -135,9 +134,9 @@ void main() {
 		m.x=spins[icell];
 		m.y=spins[icell+pad];
 		m.z=spins[icell+2*pad];
-		gradient_values_x[0] = -mult*regions_book[regions[icell]].Ms * regions_book[regions[icell]].external_field_magnitude*regions_book[regions[icell]].external_field_normal[0];
-		gradient_values_y[0] = -mult*regions_book[regions[icell]].Ms * regions_book[regions[icell]].external_field_magnitude*regions_book[regions[icell]].external_field_normal[1];
-		gradient_values_z[0] = -mult*regions_book[regions[icell]].Ms * regions_book[regions[icell]].external_field_magnitude*regions_book[regions[icell]].external_field_normal[2];
+		gradient_values_x[0] = - regions_book[regions[icell]].external_field_magnitude*regions_book[regions[icell]].external_field_normal[0];
+		gradient_values_y[0] = - regions_book[regions[icell]].external_field_magnitude*regions_book[regions[icell]].external_field_normal[1];
+		gradient_values_z[0] = - regions_book[regions[icell]].external_field_magnitude*regions_book[regions[icell]].external_field_normal[2];
 		/*
 		//Zeeman - Custom field 
 		if ((x-WIDTH*0.5f)*(x-WIDTH*0.5f)+(y-HEIGHT*0.5f)*(y-HEIGHT*0.5f) > 0.2*WIDTH*HEIGHT){
@@ -361,8 +360,7 @@ void main() {
 				gradient_values_y[3] += regions_book[regions[icell]].Dmi_bulk * regions_book[regions[icell]].Ms_inv * ((spins_plus[0] - spins_0[0]) * (regions_book[regions[icell]].cell_sizes_inv[2])-0.5*regions_book[regions[icell]].Dmi_bulk*regions_book[regions[icell]].Aexch_inv*spins_0[1]);
 		
 			}else {
-				uint icell_plus=x+y*WIDTH+zr*WIDTH*HEIGHT;
-				uint icell_minus=x+y*WIDTH+zl*WIDTH*HEIGHT;
+				
 				float Dl=regions_book[regions[icell_minus]].Dmi_bulk;
 				float Dr=regions_book[regions[icell_plus]].Dmi_bulk;
 				float D=regions_book[regions[icell]].Dmi_bulk;

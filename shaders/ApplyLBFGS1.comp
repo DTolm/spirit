@@ -40,9 +40,9 @@ layout(std430, binding = 7) writeonly buffer PartialSums
 {
    float partial_sums[];
 };
-layout(binding = 8) buffer MaxMove
+layout(binding = 8) buffer LastMax
 {
-   float maxmove [];
+   float lastMax [];
 };
 
 layout(push_constant) uniform PushConsts
@@ -70,13 +70,12 @@ void main() {
 		}
 		if (gl_LocalInvocationID.x==gl_WorkGroupSize.x-1){
 			for (uint j=0;j<consts.num_mem;j++){
-				
-					control[j+2*consts.num_mem*gl_WorkGroupID.x]=0;//rho
+				control[j+2*consts.num_mem*gl_WorkGroupID.x]=0;//rho
 			}
 		}
 	} else{
 		d_a[gl_GlobalInvocationID.x+i*consts.nos*3]=sd[gl_GlobalInvocationID.x];
-		d_g[gl_GlobalInvocationID.x+i*consts.nos*3]=grad[gl_GlobalInvocationID.x]-grad_pr[gl_GlobalInvocationID.x];
+		d_g[gl_GlobalInvocationID.x+i*consts.nos*3]=grad_pr[gl_GlobalInvocationID.x]-grad[gl_GlobalInvocationID.x];
 
 		float dot = 0.0;
 		float dot2 = 0.0;
@@ -116,8 +115,45 @@ void main() {
 
 	if (gl_GlobalInvocationID.x==0)
 	{
+		float torque=sqrt(lastMax[0]);
+		if (iteration[gl_NumWorkGroups.x]==0){
+			lastMax[10]=(torque<1) ? consts.max_move*torque : consts.max_move;
+			lastMax[11]=1e20;
+			lastMax[12]=1e20;
+			lastMax[13]=1e20;
+		}
 		iteration[gl_NumWorkGroups.x]+=1;
-		if (iteration[gl_NumWorkGroups.x]%200000000==0)
-			maxmove[1] *= 0.5;
+		if (iteration[gl_NumWorkGroups.x]%100==0)
+		{	
+			if (torque>1e-3){
+				float energy=2*lastMax[1]+lastMax[2]+lastMax[3]+lastMax[4]+lastMax[5];
+				if (energy>lastMax[11])
+				{
+					float new_max_move=lastMax[10]*0.98;
+					lastMax[10]=new_max_move;
+					lastMax[17]=new_max_move;
+				}
+				
+				lastMax[11]=energy;
+				lastMax[12]=torque;
+			} else {
+				if (torque>lastMax[12])
+				{
+					float new_max_move=lastMax[10]*0.99;
+					lastMax[10]=new_max_move;
+					lastMax[17]=new_max_move;
+				}
+				
+				lastMax[12]=torque;
+				
+			}
+
+			
+		}
+
+		
+		/*float newMax = lastMax[10]*torque;
+		lastMax[17] = ((torque<1)&&(newMax<lastMax[17])) ? newMax : lastMax[17];*/
+				
 	}
 }

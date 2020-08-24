@@ -60,9 +60,10 @@ void main() {
 	
 				control[i+2*consts.num_mem*gl_WorkGroupID.x]=1.0f/r_inv;
 			}
-			q_vec[gl_GlobalInvocationID.x]=grad[gl_GlobalInvocationID.x];
+			q_vec[gl_GlobalInvocationID.x]=-grad[gl_GlobalInvocationID.x];
 		}else{
 			grad_pr[gl_GlobalInvocationID.x]=grad[gl_GlobalInvocationID.x];
+			
 			sd[gl_GlobalInvocationID.x]=-grad[gl_GlobalInvocationID.x];
 			for (uint j=0;j<consts.num_mem;j++){
 				d_a[gl_GlobalInvocationID.x+j*consts.nos*3]=0;

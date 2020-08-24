@@ -9,6 +9,9 @@ glslangvalidator -V Apply3.comp -o Apply3.spv --target-env spirv1.3
 glslangvalidator -V ApplyVP1.comp -o ApplyVP1.spv --target-env spirv1.3
 glslangvalidator -V ApplyVP2_float.comp -o ApplyVP2_float.spv --target-env spirv1.3
 glslangvalidator -V ApplyVP2_double.comp -o ApplyVP2_double.spv --target-env spirv1.3
+glslangvalidator -V ApplyCG1.comp -o ApplyCG1.spv --target-env spirv1.3
+glslangvalidator -V ApplyCG2_float.comp -o ApplyCG2_float.spv --target-env spirv1.3
+glslangvalidator -V ApplyCG2_double.comp -o ApplyCG2_double.spv --target-env spirv1.3
 glslangvalidator -V ApplyLBFGS1.comp -o ApplyLBFGS1.spv --target-env spirv1.3
 glslangvalidator -V ApplyLBFGS2.comp -o ApplyLBFGS2.spv --target-env spirv1.3
 glslangvalidator -V ApplyLBFGS3.comp -o ApplyLBFGS3.spv --target-env spirv1.3

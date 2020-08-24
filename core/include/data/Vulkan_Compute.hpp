@@ -25,7 +25,7 @@ const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation"
 };
 
-#ifdef NDEBUG
+#ifndef NDEBUG
     const bool enableValidationLayers = false;
 #else
     const bool enableValidationLayers = true;
@@ -51,6 +51,7 @@ namespace VulkanCompute
 		int n_lbfgs_memory=3;
 		bool performZeropadding[3] = { false, false, false };
 		scalar gamma= 0.00176085964411;
+		scalar maxTorque = 1e-2;
 		scalar max_move=200;
 		scalar kernel_accuracy=6.0;
 		int GPU_ID=0;
@@ -100,6 +101,10 @@ namespace VulkanCompute
 			scalar alpha;
 			scalar rhopdg;
 		} apply2Consts;
+		struct ApplyCGConsts {
+			uint32_t pad;
+			scalar dt;
+		} applyCGConsts;
 		struct ApplyVP1Consts {
 			uint32_t n;
 			uint32_t pad;
@@ -204,6 +209,7 @@ namespace VulkanCompute
 		VkCommandBuffer commandBufferTransferSolver;
 		VkCommandBuffer commandBufferTransferSolver2;
 		VkCommandBuffer commandBufferFullVP;
+		VkCommandBuffer commandBufferFullCG;
 		VkCommandBuffer commandBufferFullLBFGS;
 		VkCommandBuffer commandBufferFullDepondt; 
 		VkCommandBuffer commandBufferFullRK4; 
@@ -737,6 +743,10 @@ namespace VulkanCompute
 				initRK4();
 				createRK4(&vulkanLBFGS);
 				break;
+			case 4:
+				initCG();
+				createCG(&vulkanLBFGS);
+				break;
 			}
 		}
 		void updateRegionsBook(regionbook regions_book, int region_num) {
@@ -764,16 +774,24 @@ namespace VulkanCompute
 				launchConfiguration.solver_type = -1;
 				break;
 			case 1:
+				deleteVP();
 				deleteCollectionVP(&vulkanLBFGS);
 				launchConfiguration.solver_type = -1;
 				break;
 			
 			case 2:
+				deleteDepondt();
 				deleteCollectionDepondt(&vulkanLBFGS);
 				launchConfiguration.solver_type = -1;
 				break;
 			case 3:
+				deleteRK4();
 				deleteCollectionRK4(&vulkanLBFGS);
+				launchConfiguration.solver_type = -1;
+				break;
+			case 4:
+				deleteCG();
+				deleteCollectionCG(&vulkanLBFGS);
 				launchConfiguration.solver_type = -1;
 				break;
 			}
@@ -1650,14 +1668,17 @@ namespace VulkanCompute
 				vulkanReduce->sizes[i] = n;
 				allocateBuffer(&vulkanReduce->buffer[i], &vulkanReduce->deviceMemory[i], VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_HEAP_DEVICE_LOCAL_BIT, 9*vulkanReduce->sizes[i] * sizeof(float));
 			}
-			
+			/*n = (n + localSize - 1) / localSize;
+			vulkanReduce->sizes[vulkanReduce->bufferNum - 1] = n;
+			allocateBuffer(&vulkanReduce->buffer[vulkanReduce->bufferNum - 1], &vulkanReduce->deviceMemory[vulkanReduce->bufferNum - 1], VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_HEAP_DEVICE_LOCAL_BIT, 18 * vulkanReduce->sizes[vulkanReduce->bufferNum - 1] * sizeof(float));
+			*/
 			n = SIZES[0] * SIZES[1] * SIZES[2];
 			for (int i = 0; i < vulkanReduce->bufferNumMax; i++)
 			{
 				n = (n + localSize - 1) / localSize;
 				vulkanReduce->sizesMax[i] = n;
 			}
-			allocateBuffer(&vulkanReduce->lastMax, &vulkanReduce->deviceMemoryLastMax, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT, 17*sizeof(float));
+			allocateBuffer(&vulkanReduce->lastMax, &vulkanReduce->deviceMemoryLastMax, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT, 18*sizeof(float));
 		}
 		void deleteReduceBuffers(VulkanReduce* vulkanReduce) {
 			
@@ -4091,8 +4112,8 @@ namespace VulkanCompute
 
 					if (i == 8) {
 						descriptorBufferInfo.buffer = vulkanReduce.lastMax;
-						descriptorBufferInfo.offset = 16 * sizeof(float);
-						descriptorBufferInfo.range = 2 * sizeof(float);
+						descriptorBufferInfo.offset = 0;
+						descriptorBufferInfo.range = 18 * sizeof(float);
 					}
 					VkWriteDescriptorSet writeDescriptorSet = { };
 					writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -6203,7 +6224,454 @@ namespace VulkanCompute
 
 		}
 
+		//CG
+		void initCG() {
+			int n = SIZES[0] * SIZES[1] * SIZES[2];
 
+			/*vectorfield velocity = vectorfield(n, { 0,0,0 });
+			vectorfield searchdir = vectorfield(n, { 0,0,0 });
+			vectorfield grad = vectorfield(n, { 0,0,0 });
+			vectorfield grad_pr = vectorfield(n, { 0,0,0 });*/
+
+			//vulkanReduce.bufferNum++;
+			vulkanLBFGS.bufferSizes = (VkDeviceSize*)malloc(sizeof(VkDeviceSize));
+
+			for (int i = 0; i < 1; i++)
+			{
+				vulkanLBFGS.bufferSizes[i] = 3 * n * sizeof(float);
+			}
+
+			vulkanLBFGS.buffer = (VkBuffer*)malloc(sizeof(VkBuffer));
+			vulkanLBFGS.deviceMemory = (VkDeviceMemory*)malloc(sizeof(VkDeviceMemory));
+
+			for (int i = 0; i < 1; i++)
+			{
+				allocateBuffer(&vulkanLBFGS.buffer[i], &vulkanLBFGS.deviceMemory[i], VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_HEAP_DEVICE_LOCAL_BIT, vulkanLBFGS.bufferSizes[i]);
+			}
+			/*uint32_t* reduce = (uint32_t*)malloc(vulkanReduce.sizes[vulkanReduce.bufferNum-1]);
+			for (uint32_t i = 0; i < vulkanReduce.sizes[vulkanReduce.bufferNum - 1] / sizeof(scalar); ++i) {
+				reduce[i] = 0;
+			}
+			transferDataFromCPU(reduce, vulkanReduce.sizes[vulkanReduce.bufferNum - 1], &vulkanReduce.buffer[vulkanReduce.bufferNum - 1]);
+			*/
+		}
+		void deleteCG() {
+
+			for (int i = 0; i < 1; i++)
+			{
+				vkFreeMemory(device, vulkanLBFGS.deviceMemory[i], NULL);
+				vkDestroyBuffer(device, vulkanLBFGS.buffer[i], NULL);
+			}
+		}
+		void createCG(VulkanLBFGS* vulkanLBFGS) {
+			uint32_t nos = SIZES[0] * SIZES[1] * SIZES[2];
+			createReduceVPFinish(&vulkanLBFGS->collectionReduceDotFinish, &vulkanReduce, 1);
+			//createReduceDotFinish(&vulkanLBFGS->collectionReduceDotFinish, &vulkanReduce, 1);
+			//createOsoCalcGradients(&vulkanLBFGS->collectionOsoCalcGradients, 1);
+
+
+			//vulkanLBFGS->applyCG2Consts.grad_mult = 0;
+			vulkanLBFGS->applyCGConsts.pad = SIZES[0] * SIZES[1] * SIZES[2];
+			vulkanLBFGS->applyCGConsts.dt = launchConfiguration.gamma / 0.176085964411;
+			createApplyCG2(&vulkanLBFGS->collectionApply2);
+
+			createApplyCG1(&vulkanLBFGS->collectionApply1);
+
+			scalar gamma_transfer[2];
+			gamma_transfer[0] = 0;
+			gamma_transfer[1] = 0;
+			void* map;
+			vkMapMemory(device, vulkanReduce.deviceMemoryLastMax, 16 * sizeof(scalar), 2 * sizeof(scalar), 0, &map);
+			memcpy(map, gamma_transfer, 2 * sizeof(scalar));
+			vkUnmapMemory(device, vulkanReduce.deviceMemoryLastMax);
+
+			vulkanLBFGS->ReduceDotConsts[0] = nos;
+			vulkanLBFGS->ReduceDotConsts[1] = 0;
+			vulkanLBFGS->ReduceDotConsts[2] = 0;
+			vulkanLBFGS->ReduceDotConsts[3] = SIZES[0] * SIZES[1];
+			createReduceFullDataFinish(&vulkanLBFGS->collectionReduceEnergyFinish, &vulkanReduce, 9);
+			//createReduceMaxFinish(&vulkanLBFGS->collectionReduceMaxFinish, &vulkanReduce, 1);
+			createCommandBufferFullCG();
+			vulkanLBFGS->submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			vulkanLBFGS->submitInfo.commandBufferCount = 1;
+			vulkanLBFGS->submitInfo.pCommandBuffers = &commandBufferFullCG;
+
+
+		};
+		void deleteCollectionCG(VulkanLBFGS* vulkanLBFGS) {
+			deleteCollection(&vulkanLBFGS->collectionReduceDotFinish);
+			//deleteCollection(&vulkanLBFGS->collectionReduceMaxFinish);
+			deleteCollection(&vulkanLBFGS->collectionApply2);
+			deleteCollection(&vulkanLBFGS->collectionApply1);
+			deleteCollection(&vulkanLBFGS->collectionReduceEnergyFinish);
+			vkFreeCommandBuffers(device, commandPool, 1, &commandBufferFullCG);
+			vulkanLBFGS = NULL;
+		};
+		void CG_iterate() {
+
+			vkQueueSubmit(queue, 1, &vulkanLBFGS.submitInfo, fence);
+			vkWaitForFences(device, 1, &fence, VK_TRUE, 100000000000);
+			vkResetFences(device, 1, &fence);
+
+		}
+		void createCommandBufferFullCG() {
+
+			VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
+			commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+			commandBufferAllocateInfo.commandPool = commandPool;
+			commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+			commandBufferAllocateInfo.commandBufferCount = 1;
+			vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &commandBufferFullCG);
+			VkCommandBufferBeginInfo commandBufferBeginInfo = {};
+			commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			commandBufferBeginInfo.flags = NULL;
+			VK_CHECK_RESULT(vkBeginCommandBuffer(commandBufferFullCG, &commandBufferBeginInfo));
+			recordFullBufferCG(&commandBufferFullCG);
+			VK_CHECK_RESULT(vkEndCommandBuffer(commandBufferFullCG));
+		}
+		void createApplyCG2(VulkanCollection* collection) {
+			{
+				VkDescriptorPoolSize descriptorPoolSize[1] = { };
+				descriptorPoolSize[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				descriptorPoolSize[0].descriptorCount = 4;
+				//collection->descriptorNum = descriptorPoolSize[0].descriptorCount;
+
+				VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
+				descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+				descriptorPoolCreateInfo.poolSizeCount = COUNT_OF(descriptorPoolSize);
+				descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSize;
+				descriptorPoolCreateInfo.maxSets = 1;
+				vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, NULL, &collection[0].descriptorPool);
+			}
+
+			{
+				const VkDescriptorType descriptorType[] = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
+				collection[0].descriptorSetLayouts = (VkDescriptorSetLayout*)malloc(sizeof(VkDescriptorSetLayout));
+				collection[0].descriptorSets = (VkDescriptorSet*)malloc(sizeof(VkDescriptorSet));
+				collection->descriptorNum = 1;
+				VkDescriptorSetLayoutBinding descriptorSetLayoutBindings[COUNT_OF(descriptorType)];
+				for (uint32_t i = 0; i < COUNT_OF(descriptorSetLayoutBindings); ++i) {
+					descriptorSetLayoutBindings[i].binding = i;
+					descriptorSetLayoutBindings[i].descriptorType = descriptorType[i];
+					descriptorSetLayoutBindings[i].descriptorCount = 1;
+					descriptorSetLayoutBindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+				}
+				VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
+				descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+				descriptorSetLayoutCreateInfo.bindingCount = COUNT_OF(descriptorSetLayoutBindings);
+				descriptorSetLayoutCreateInfo.pBindings = descriptorSetLayoutBindings;
+				vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, NULL, collection[0].descriptorSetLayouts);
+				VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = { };
+				descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+				descriptorSetAllocateInfo.descriptorPool = collection[0].descriptorPool;
+				descriptorSetAllocateInfo.descriptorSetCount = 1;
+				descriptorSetAllocateInfo.pSetLayouts = collection[0].descriptorSetLayouts;
+				vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo, collection[0].descriptorSets);
+				for (uint32_t i = 0; i < COUNT_OF(descriptorType); ++i) {
+					VkDescriptorBufferInfo descriptorBufferInfo = { };
+					if (i == 0) {
+						descriptorBufferInfo.buffer = bufferGradient;
+						descriptorBufferInfo.offset = bufferSizeGradient;
+						descriptorBufferInfo.range = bufferSizeGradient;
+					}
+					if (i == 1) {
+						descriptorBufferInfo.buffer = vulkanLBFGS.buffer[0];
+						descriptorBufferInfo.offset = 0;
+						descriptorBufferInfo.range = vulkanLBFGS.bufferSizes[0];
+					}
+					if (i == 2) {
+						descriptorBufferInfo.buffer = bufferSpins;
+						descriptorBufferInfo.offset = 0;
+						descriptorBufferInfo.range = bufferSizeSpins;
+					}
+					if (i == 3) {
+						descriptorBufferInfo.buffer = vulkanReduce.lastMax;
+						descriptorBufferInfo.offset = 16 * sizeof(float);
+						descriptorBufferInfo.range = 2 * sizeof(float);
+					}
+
+
+					VkWriteDescriptorSet writeDescriptorSet = { };
+					writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+					writeDescriptorSet.dstSet = collection[0].descriptorSets[0];
+					writeDescriptorSet.dstBinding = i;
+					writeDescriptorSet.dstArrayElement = 0;
+					writeDescriptorSet.descriptorType = descriptorType[i];
+					writeDescriptorSet.descriptorCount = 1;
+					writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
+					vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, NULL);
+				}
+			}
+
+			{
+
+				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
+				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+				pipelineLayoutCreateInfo.setLayoutCount = 1;
+				pipelineLayoutCreateInfo.pSetLayouts = collection[0].descriptorSetLayouts;
+				VkPushConstantRange pushConstantRange = {};
+				pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+				pushConstantRange.offset = 0;
+				pushConstantRange.size = 2*sizeof(scalar);
+				// Push constant ranges are part of the pipeline layout
+				pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+				pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
+				vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, NULL, &collection[0].pipelineLayout);
+				VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo = { };
+				VkComputePipelineCreateInfo computePipelineCreateInfo = { };
+				uint32_t specialization = 32;
+
+				std::array<VkSpecializationMapEntry, 1> specializationMapEntries;
+				specializationMapEntries[0].constantID = 1;
+				specializationMapEntries[0].size = sizeof(uint32_t);
+				specializationMapEntries[0].offset = 0;
+
+				VkSpecializationInfo specializationInfo{};
+				specializationInfo.dataSize = sizeof(uint32_t);
+				specializationInfo.mapEntryCount = static_cast<uint32_t>(specializationMapEntries.size());
+				specializationInfo.pMapEntries = specializationMapEntries.data();
+				specializationInfo.pData = &specialization;
+
+
+
+				pipelineShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+				pipelineShaderStageCreateInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+				pipelineShaderStageCreateInfo.pSpecializationInfo = &specializationInfo;
+				uint32_t filelength;
+				uint32_t* code;
+				if (launchConfiguration.double_precision_rotate == true)
+					code = readShader(filelength, "shaders/ApplyCG2_double.spv");
+				else
+					code = readShader(filelength, "shaders/ApplyCG2_float.spv");
+				VkShaderModuleCreateInfo createInfo = {};
+				createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+				createInfo.pCode = code;
+				createInfo.codeSize = filelength;
+				vkCreateShaderModule(device, &createInfo, NULL, &pipelineShaderStageCreateInfo.module);
+				delete[] code;
+				pipelineShaderStageCreateInfo.pName = "main";
+				computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+				computePipelineCreateInfo.stage = pipelineShaderStageCreateInfo;
+				computePipelineCreateInfo.layout = collection[0].pipelineLayout;
+
+
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
+			}
+			{
+				VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
+				commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+				commandBufferAllocateInfo.commandPool = commandPool;
+				commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+				commandBufferAllocateInfo.commandBufferCount = 1;
+				VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &collection[0].commandBuffer)); // allocate command buffer.
+				vulkanLBFGS.applyCGConsts.pad = SIZES[0] * SIZES[1] * SIZES[2];
+				recordApplyCG2(collection);
+			}
+		}
+		void recordApplyCG2(VulkanCollection* collection) {
+
+			VkCommandBufferBeginInfo beginInfo = {};
+			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
+			vkCmdPushConstants(collection[0].commandBuffer, collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,2* sizeof(scalar), &vulkanLBFGS.applyCGConsts);
+			vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
+			vkCmdDispatch(collection[0].commandBuffer, (uint32_t)ceil(SIZES[0] * SIZES[1] * SIZES[2] / 1024.0f), 1, 1);
+			VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
+		}
+		void recordApplyCG2Append(VulkanCollection* collection, VkCommandBuffer* commandBuffer) {
+
+			vkCmdPushConstants(commandBuffer[0], collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 2*sizeof(scalar), &vulkanLBFGS.applyCGConsts);
+			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindDescriptorSets(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
+			vkCmdDispatch(commandBuffer[0], (uint32_t)ceil(SIZES[0] * SIZES[1] * SIZES[2] / 1024.0f), 1, 1);
+
+		}
+		void recordFullBufferCG(VkCommandBuffer* commandBuffer) {
+			int nos = SIZES[0] * SIZES[1] * SIZES[2];
+			VkMemoryBarrier memory_barrier = {
+					VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+					nullptr,
+					VK_ACCESS_SHADER_WRITE_BIT,
+					VK_ACCESS_SHADER_READ_BIT,//VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
+			};
+			//int groupedIterations = 1;// std::max(1, 8 * 1024 * 1024 / nos);
+			for (int i = 0; i < launchConfiguration.groupedIterations; i++) {
+				if (launchConfiguration.DDI == true) {
+					app_convolution.VkFFTAppend(commandBuffer[0]);
+				}
+				recordComputeGradients_noDDIAppend(&collectionGradients_noDDI_save, commandBuffer);
+				vkCmdPipelineBarrier(commandBuffer[0], VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &memory_barrier, 0, NULL, 0, NULL);
+				if (nos > 1024) {
+					recordReduceMaxFinishAppend(&vulkanLBFGS.collectionReduceEnergyFinish, commandBuffer, &vulkanReduce, &memory_barrier);
+					//recordReduceMaxFinishAppend(&vulkanLBFGS.collectionReduceMaxFinish, commandBuffer, &vulkanReduce, &memory_barrier);
+
+				}
+
+
+				recordApplyCG1Append(&vulkanLBFGS.collectionApply1, commandBuffer);
+				vkCmdPipelineBarrier(commandBuffer[0], VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &memory_barrier, 0, NULL, 0, NULL);
+
+				if (nos > 1024) {
+					recordReduceDotFinishAppend(&vulkanLBFGS.collectionReduceDotFinish, commandBuffer, &vulkanReduce, &memory_barrier);
+				}
+				recordApplyCG2Append(&vulkanLBFGS.collectionApply2, commandBuffer);
+				vkCmdPipelineBarrier(commandBuffer[0], VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &memory_barrier, 0, NULL, 0, NULL);
+
+				/*if (nos > 1024) {
+					recordReduceMaxFinishAppend(&vulkanLBFGS.collectionReduceMaxFinish, commandBuffer, &vulkanReduce, &memory_barrier);
+				}*/
+			}
+		}
+		void createApplyCG1(VulkanCollection* collection) {
+			{
+				VkDescriptorPoolSize descriptorPoolSize[1] = { };
+				descriptorPoolSize[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				descriptorPoolSize[0].descriptorCount = 2;
+				//collection->descriptorNum = descriptorPoolSize[0].descriptorCount;
+
+				VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
+				descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+				descriptorPoolCreateInfo.poolSizeCount = COUNT_OF(descriptorPoolSize);
+				descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSize;
+				descriptorPoolCreateInfo.maxSets = 1;
+				vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, NULL, &collection[0].descriptorPool);
+			}
+
+			{
+				const VkDescriptorType descriptorType[] = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER};
+				collection[0].descriptorSetLayouts = (VkDescriptorSetLayout*)malloc(sizeof(VkDescriptorSetLayout));
+				collection[0].descriptorSets = (VkDescriptorSet*)malloc(sizeof(VkDescriptorSet));
+				collection->descriptorNum = 1;
+				VkDescriptorSetLayoutBinding descriptorSetLayoutBindings[COUNT_OF(descriptorType)];
+				for (uint32_t i = 0; i < COUNT_OF(descriptorSetLayoutBindings); ++i) {
+					descriptorSetLayoutBindings[i].binding = i;
+					descriptorSetLayoutBindings[i].descriptorType = descriptorType[i];
+					descriptorSetLayoutBindings[i].descriptorCount = 1;
+					descriptorSetLayoutBindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+				}
+				VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
+				descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+				descriptorSetLayoutCreateInfo.bindingCount = COUNT_OF(descriptorSetLayoutBindings);
+				descriptorSetLayoutCreateInfo.pBindings = descriptorSetLayoutBindings;
+				vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, NULL, collection[0].descriptorSetLayouts);
+				VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = { };
+				descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+				descriptorSetAllocateInfo.descriptorPool = collection[0].descriptorPool;
+				descriptorSetAllocateInfo.descriptorSetCount = 1;
+				descriptorSetAllocateInfo.pSetLayouts = collection[0].descriptorSetLayouts;
+				vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo, collection[0].descriptorSets);
+				for (uint32_t i = 0; i < COUNT_OF(descriptorType); ++i) {
+					VkDescriptorBufferInfo descriptorBufferInfo = { };
+					if (i == 0) {
+						descriptorBufferInfo.buffer = bufferGradient;
+						descriptorBufferInfo.offset = bufferSizeGradient;
+						descriptorBufferInfo.range = bufferSizeGradient;
+					}
+					if (i == 1) {
+						descriptorBufferInfo.buffer = vulkanReduce.buffer[0];
+						descriptorBufferInfo.offset = 0;
+						descriptorBufferInfo.range =  vulkanReduce.sizes[0] * sizeof(float);
+					}
+
+					VkWriteDescriptorSet writeDescriptorSet = { };
+					writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+					writeDescriptorSet.dstSet = collection[0].descriptorSets[0];
+					writeDescriptorSet.dstBinding = i;
+					writeDescriptorSet.dstArrayElement = 0;
+					writeDescriptorSet.descriptorType = descriptorType[i];
+					writeDescriptorSet.descriptorCount = 1;
+					writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
+					vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, NULL);
+				}
+			}
+
+			{
+
+				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
+				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+				pipelineLayoutCreateInfo.setLayoutCount = 1;
+				pipelineLayoutCreateInfo.pSetLayouts = collection[0].descriptorSetLayouts;
+				VkPushConstantRange pushConstantRange = {};
+				pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+				pushConstantRange.offset = 0;
+				pushConstantRange.size = 2*sizeof(scalar);
+				// Push constant ranges are part of the pipeline layout
+				pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+				pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
+				vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, NULL, &collection[0].pipelineLayout);
+				VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo = { };
+				VkComputePipelineCreateInfo computePipelineCreateInfo = { };
+
+				struct SpecializationData {
+					uint32_t local_size_x_id;
+					uint32_t sumSubGroupSize;
+				} specializationData;
+				specializationData.local_size_x_id = 1024;
+				specializationData.sumSubGroupSize = 32;
+				std::array<VkSpecializationMapEntry, 2> specializationMapEntries;
+				specializationMapEntries[0].constantID = 1;
+				specializationMapEntries[0].size = sizeof(uint32_t);
+				specializationMapEntries[0].offset = 0;
+				specializationMapEntries[1].constantID = 2;
+				specializationMapEntries[1].size = sizeof(uint32_t);
+				specializationMapEntries[1].offset = sizeof(uint32_t);
+
+				VkSpecializationInfo specializationInfo{};
+				specializationInfo.dataSize = 2 * sizeof(uint32_t);
+				specializationInfo.mapEntryCount = static_cast<uint32_t>(specializationMapEntries.size());
+				specializationInfo.pMapEntries = specializationMapEntries.data();
+				specializationInfo.pData = &specializationData;
+
+				pipelineShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+				pipelineShaderStageCreateInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+				uint32_t filelength;
+				uint32_t* code = readShader(filelength, "shaders/ApplyCG1.spv");
+				VkShaderModuleCreateInfo createInfo = {};
+				createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+				createInfo.pCode = code;
+				createInfo.codeSize = filelength;
+				vkCreateShaderModule(device, &createInfo, NULL, &pipelineShaderStageCreateInfo.module);
+				delete[] code;
+				pipelineShaderStageCreateInfo.pName = "main";
+				pipelineShaderStageCreateInfo.pSpecializationInfo = &specializationInfo;
+				computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+				computePipelineCreateInfo.stage = pipelineShaderStageCreateInfo;
+				computePipelineCreateInfo.layout = collection[0].pipelineLayout;
+
+
+
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
+			}
+			{
+				VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
+				commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+				commandBufferAllocateInfo.commandPool = commandPool;
+				commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+				commandBufferAllocateInfo.commandBufferCount = 1;
+				VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &collection[0].commandBuffer)); // allocate command buffer.
+				VkCommandBufferBeginInfo beginInfo = {};
+				beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+				VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
+				vkCmdPushConstants(collection[0].commandBuffer, collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,  2*sizeof(uint32_t), &vulkanLBFGS.applyCGConsts);
+				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+				vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
+				vkCmdDispatch(collection[0].commandBuffer, vulkanReduce.sizes[0], 1, 1);
+				VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
+
+			}
+		}
+		void recordApplyCG1Append(VulkanCollection* collection, VkCommandBuffer* commandBuffer) {
+			vkCmdPushConstants(commandBuffer[0], collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 2* sizeof(uint32_t), &vulkanLBFGS.applyCGConsts);
+			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindDescriptorSets(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
+			vkCmdDispatch(commandBuffer[0], vulkanReduce.sizes[0], 1, 1);
+
+		}
 
 		//Depondt
 		void initDepondt() {
@@ -6849,10 +7317,10 @@ namespace VulkanCompute
 				pipelineShaderStageCreateInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
 				uint32_t filelength;
 				uint32_t* code;
-				if (launchConfiguration.double_precision_rotate == true)
+				/*if (launchConfiguration.double_precision_rotate == true)
 					code = readShader(filelength, "shaders/ApplyRK4_1_double.spv");
-				else
-					code = readShader(filelength, "shaders/ApplyRK4_1_float.spv");
+				else*/
+				code = readShader(filelength, "shaders/ApplyRK4_1_float.spv");
 
 				VkShaderModuleCreateInfo createInfo = {};
 				createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -6992,10 +7460,10 @@ namespace VulkanCompute
 				pipelineShaderStageCreateInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
 				uint32_t filelength;
 				uint32_t* code;
-				if (launchConfiguration.double_precision_rotate == true)
+				/*if (launchConfiguration.double_precision_rotate == true)
 					code = readShader(filelength, "shaders/ApplyRK4_2_double.spv");
-				else
-					code = readShader(filelength, "shaders/ApplyRK4_2_float.spv");
+				else*/
+				code = readShader(filelength, "shaders/ApplyRK4_2_float.spv");
 				VkShaderModuleCreateInfo createInfo = {};
 				createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 				createInfo.pCode = code;
@@ -7132,10 +7600,10 @@ namespace VulkanCompute
 				pipelineShaderStageCreateInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
 				uint32_t filelength;
 				uint32_t* code;
-				if (launchConfiguration.double_precision_rotate == true)
+				/*if (launchConfiguration.double_precision_rotate == true)
 					code = readShader(filelength, "shaders/ApplyRK4_3_double.spv");
-				else
-					code = readShader(filelength, "shaders/ApplyRK4_3_float.spv");
+				else*/
+				code = readShader(filelength, "shaders/ApplyRK4_3_float.spv");
 				VkShaderModuleCreateInfo createInfo = {};
 				createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 				createInfo.pCode = code;
@@ -7284,10 +7752,10 @@ namespace VulkanCompute
 				pipelineShaderStageCreateInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
 				uint32_t filelength;
 				uint32_t* code;
-				if (launchConfiguration.double_precision_rotate == true)
+				/*if (launchConfiguration.double_precision_rotate == true)
 					code = readShader(filelength, "shaders/ApplyRK4_4_double.spv");
-				else
-					code = readShader(filelength, "shaders/ApplyRK4_4_float.spv");
+				else*/
+				code = readShader(filelength, "shaders/ApplyRK4_4_float.spv");
 				VkShaderModuleCreateInfo createInfo = {};
 				createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 				createInfo.pCode = code;
@@ -7440,11 +7908,6 @@ namespace VulkanCompute
 			if (enableValidationLayers) {
 				DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 			}
-
-			if (launchConfiguration.solver_type == 0) deleteLBFGS();
-			if (launchConfiguration.solver_type == 1) deleteVP();
-			if (launchConfiguration.solver_type == 2) deleteDepondt();
-			if (launchConfiguration.solver_type == 3) deleteRK4();
 
 			if (launchConfiguration.DDI ) {
 				free_DDI();

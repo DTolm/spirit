@@ -47,7 +47,7 @@ void main() {
 		uint c=(consts.k+i+1)%consts.num_mem;
 		q_vec[gl_GlobalInvocationID.x]-=d_g[gl_GlobalInvocationID.x +c*consts.nos*3]*control[c+2*consts.num_mem*gl_WorkGroupID.x]*reduceResults[0];
 		if (consts.k==0){
-			float rhody2 = reduceResults[1]*control[i];
+			float rhody2 = reduceResults[1]*control[i+2*consts.num_mem*gl_WorkGroupID.x];
 			float inv_rhody2;
 			if (rhody2 > consts.eps)
 				inv_rhody2 = 1.0 / rhody2;

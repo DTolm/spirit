@@ -54,16 +54,11 @@ layout(binding = 3) readonly buffer Data4
    float reduceResults[];
 };
 
-layout(std430, binding = 4) writeonly buffer PartialMax
-{
-   float partial_max[];
-};
-
 layout(push_constant) uniform PushConsts
 {
-  float dt;
-  float grad_add;
   uint pad;
+  float dt;
+  float m_temp_inv;
 } consts;
 
 shared float sdata[sumSubGroupSize];
@@ -73,45 +68,42 @@ void main() {
 	grad_pr[id_x]=grad[id_x];
 	grad_pr[id_x+consts.pad]=grad[id_x+consts.pad];
 	grad_pr[id_x+2*consts.pad]=grad[id_x+2*consts.pad];
-	double grad_mult=0;
-	if (reduceResults[0] <= 0) {
-		grad_mult = consts.grad_add;//-consts.dt * 0.5 * consts.m_temp_inv;
-	}
-	else {
-		grad_mult = consts.grad_add-consts.dt * reduceResults[0]/reduceResults[1];
-	}
-	//float temp_x=0;
-	//float temp_y=0;
-	//float temp_z=0;
-	double theta = sqrt(grad_mult*grad[id_x]*grad_mult*grad[id_x]+grad_mult*grad[id_x+consts.pad]*grad_mult*grad[id_x+consts.pad]+grad_mult*grad[id_x+2*consts.pad]*grad_mult*grad[id_x+2*consts.pad]);
+	vec3 s_loc;
+	s_loc.x=s[id_x];
+	s_loc.y=s[id_x+consts.pad];
+	s_loc.z=s[id_x+2*consts.pad];
+	double beta= reduceResults[0]/reduceResults[1];
+	if (beta>0) beta=0;
+	dvec3 sd_loc;
+	sd_loc.x=consts.dt*grad[id_x]*(beta - consts.m_temp_inv);
+	sd_loc.y=consts.dt*grad[id_x+consts.pad]*(beta - consts.m_temp_inv);
+	sd_loc.z=consts.dt*grad[id_x+2*consts.pad]*(beta - consts.m_temp_inv);
+	double theta = length(sd_loc);
 	if (theta > 1.0e-20) // if theta is too small we do nothing
 	{
 		double theta_inv = 1.0/theta;
 		double q = cosa_11(theta);
 		double w = 1 - q;
-		double x = -grad_mult*grad[id_x]* theta_inv;
-		double y = -grad_mult*grad[id_x+consts.pad]* theta_inv;
-		double z = -grad_mult*grad[id_x+2*consts.pad]* theta_inv;
+		double x = -sd_loc.x* theta_inv;
+		double y = -sd_loc.y* theta_inv;
+		double z = -sd_loc.z* theta_inv;
 		  
-		double s1 = -y * z * w;
+		double s1 = x * z * w;
 		double s2 = x * z * w;
-		double s3 = -x * y * w;
+		double s3 = z * y * w;
 		double sin_theta = sina_11(theta);
-		double p1 = x * sin_theta;
+		double p1 = z * sin_theta;
 		double p2 = y * sin_theta;
-		double p3 = z * sin_theta;
-		double t1, t2, t3;
+		double p3 = x * sin_theta;
+		dvec3 t;
 	
-		t1 = (q + z * z * w) * s[id_x] + (s1 + p1) * s[id_x+consts.pad] + (s2 + p2) * s[id_x+2*consts.pad];
-		t2 = (s1 - p1) * s[id_x] + (q + y * y * w) * s[id_x+consts.pad] + (s3 + p3) * s[id_x+2*consts.pad];
-		t3 = (s2 - p2) * s[id_x] + (s3 - p3) * s[id_x+consts.pad] + (q + x * x * w) * s[id_x+2*consts.pad];
-		//temp_x=s[id_x]-float(t1);
-		//temp_y=s[id_x+consts.pad]-float(t2);
-		//temp_z=s[id_x+2*consts.pad]-float(t3);
-		//double t_norm=1.0;//sqrt(t1*t1+t2*t2+t3*t3);
-		s[id_x] =float(t1);//scaling;//sd[id_x];//t1;
-		s[id_x+consts.pad] = float(t2);//iteration[gl_WorkGroupID.x];//sd[id_x+consts.pad];// t2;
-		s[id_x+2*consts.pad] =float(t3);//sd[id_x+consts.pad*2];//t3;
+		t.x = (q + x* x * w) * s_loc.x + (s1 - p1) * s_loc.y + (s2 + p2) * s_loc.z;
+		t.y = (s1 + p1) * s_loc.x + (q + y * y * w) * s_loc.y + (s3 - p3) * s_loc.z;
+		t.z = (s2 - p2) * s_loc.x + (s3 + p3) * s_loc.y + (q + z * z * w) * s_loc.z;
+		t=normalize(t);
+		s[id_x] = float(t.x);
+		s[id_x+consts.pad] = float(t.y);
+		s[id_x+2*consts.pad] = float(t.z);
 	};/*
 	float max = temp_x*temp_x+temp_y*temp_y+temp_z*temp_z;
 	

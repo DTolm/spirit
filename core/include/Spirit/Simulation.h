@@ -52,6 +52,9 @@ Note that the VP and LBFGS Solvers are only meant for direct minimization and no
 // `Solver_VP_OSO`: Verlet-like velocity projection, exponential transform
 #define Solver_VP_OSO      7
 
+// `Solver_CG_OSO`: CG, exponential transform
+#define Solver_CG_OSO      8
+
 /*
 Start or stop a simulation
 --------------------------------------------------------------------

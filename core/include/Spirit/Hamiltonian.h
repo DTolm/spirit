@@ -111,6 +111,9 @@ PREFIX void Hamiltonian_Set_Exchange_Tensor(State *state, float exchange_tensor,
 
 // Set the Dzyaloshinskii-Moriya interaction tensor for micromagnetics [meV]
 PREFIX void Hamiltonian_Set_DMI_Tensor(State *state, float dmi_tensor[2], int region_id, int idx_image=-1, int idx_chain=-1) SUFFIX;
+
+//Set regions damping
+PREFIX void Hamiltonian_Set_damping(State* state, float alpha, int region_id, int idx_image = -1, int idx_chain = -1) SUFFIX;
 // Set the frozen spins
 PREFIX void Hamiltonian_Set_frozen_spins(State* state, float frozen_spins, int region_id, int idx_image = -1, int idx_chain = -1) SUFFIX;
 
@@ -180,6 +183,8 @@ PREFIX int  Hamiltonian_Get_DMI_N_Pairs(State *state, int idx_image=-1, int idx_
 
 //Micromagnetics DMI tensor
 PREFIX void Hamiltonian_Get_DMI_Tensor(State *state, float * dmi_tensor, int region_id, int idx_image=-1, int idx_chain=-1) SUFFIX;
+//Get LLG damping
+PREFIX void Hamiltonian_Get_damping(State* state, float* alpha, int region_id, int idx_image = -1, int idx_chain = -1) SUFFIX;
 //Micromagnetics DDI coefficient
 PREFIX void Hamiltonian_Get_DDI_coefficient(State* state, float* ddi, int region_id, int idx_image = -1, int idx_chain = -1) SUFFIX;
 //Micromagnetics frozen spins

@@ -167,5 +167,21 @@ Returns the spin current configuration.
 */
 PREFIX void Parameters_LLG_Get_STT(State *state, bool * use_gradient, float * magnitude, float normal[3], int idx_image=-1, int idx_chain=-1) SUFFIX;
 
+
+
+//micromagnetics
+PREFIX void Parameters_LLG_Set_dt(State* state, float dt, int idx_image = -1, int idx_chain = -1) SUFFIX;
+PREFIX void Parameters_LLG_Set_max_torque(State* state, float maxTorque, int idx_image = -1, int idx_chain = -1) SUFFIX;
+PREFIX void Parameters_LLG_Set_max_move(State* state, float max_move, int idx_image = -1, int idx_chain = -1) SUFFIX;
+PREFIX void Parameters_LLG_Set_n_LBFGS(State* state, int n_LBFGS, int idx_image = -1, int idx_chain = -1) SUFFIX;
+PREFIX void Parameters_LLG_Set_grouped_iterations(State* state, int grouped_iterations, int idx_image = -1, int idx_chain = -1) SUFFIX;
+PREFIX void Parameters_LLG_Set_save_period(State* state, int save_period, int idx_image = -1, int idx_chain = -1) SUFFIX;
+
+PREFIX void Parameters_LLG_Get_dt(State* state, float *dt, int idx_image = -1, int idx_chain = -1) SUFFIX;
+PREFIX void Parameters_LLG_Get_max_torque(State* state, float * maxTorque, int idx_image = -1, int idx_chain = -1) SUFFIX;
+PREFIX void Parameters_LLG_Get_max_move(State* state, float *max_move, int idx_image = -1, int idx_chain = -1) SUFFIX;
+PREFIX void Parameters_LLG_Get_n_LBFGS(State* state, int*n_LBFGS, int idx_image = -1, int idx_chain = -1) SUFFIX;
+PREFIX void Parameters_LLG_Get_grouped_iterations(State* state, int *grouped_iterations, int idx_image = -1, int idx_chain = -1) SUFFIX;
+PREFIX void Parameters_LLG_Get_save_period(State* state, int*save_period, int idx_image = -1, int idx_chain = -1) SUFFIX;
 #include "DLL_Undefine_Export.h"
 #endif

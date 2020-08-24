@@ -19,27 +19,6 @@ env:
 
 matrix:
   include:
-    # OSX, xcode 10
-    - os: osx
-      osx_image: xcode10
-      env: CMAKE_OPTIONS="-DUSER_PATH_QT=~/usr/local/Cellar/qt/5.11.0" PYPI=true
-    # Linux, GCC 6
-    - os: linux
-      env: COMPILER_C=gcc-6 COMPILER_CXX=g++-6 CMAKE_OPTIONS="-DUSER_PATH_QT=~/opt/qt511" PYPI=true
-      compiler: g++
-      addons:
-        apt:
-          packages:
-          - g++-6
-          - qt511base
-          - qt511charts-no-lgpl
-          - ca-certificates
-          - python2.7
-          - mesa-common-dev
-          sources:
-          - sourceline: 'ppa:ubuntu-toolchain-r/test'
-          - sourceline: 'ppa:beineri/opt-qt-5.11.1-bionic'
-          # - sourceline: 'ppa:jonathonf/python-2.7'
     # Linux, GCC 5
     - os: linux
       env: COMPILER_C=gcc-5 COMPILER_CXX=g++-5 CMAKE_OPTIONS="-DUSER_PATH_QT=~/opt/qt511" PYPI=false
@@ -125,33 +104,13 @@ matrix:
           - sourceline: 'ppa:beineri/opt-qt-5.11.1-bionic'
           # - sourceline: 'ppa:jonathonf/python-2.7'
 
-    # - compiler: clang
-    #   addons:
-    #     apt:
-    #       sources:
-    #         - ubuntu-toolchain-r-test
-    #         - llvm-toolchain-precise-3.6
-    #       packages:
-    #         - clang-3.6
-    #   env: COMPILER=clang++-3.6
-    # - compiler: clang
-    #   addons:
-    #     apt:
-    #       sources:
-    #         - ubuntu-toolchain-r-test
-    #         - llvm-toolchain-precise-3.7
-    #       packages:
-    #         - clang-3.7
-    #   env: COMPILER=clang++-3.7
-
 
 before_install:
+  - sudo apt-get install
   - python --version
   - if [ "$TRAVIS_OS_NAME" != "osx" ]; then sudo pip uninstall -y six chardet pyOpenSSL; fi
   - sudo pip install --upgrade pip six pyOpenSSL
   - sudo pip install wheel numpy urllib3==1.23 twine coveralls chardet
-  # Run homebrew on osx
-  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew update; fi
   # Setup default versions and override compiler if needed
   - if [[ "${LLVM_VERSION}" == "default" ]]; then LLVM_VERSION=3.9.0; fi
   # Install a recent CMake (unless already installed on OS X)
@@ -164,38 +123,17 @@ before_install:
       export PATH=${DEPS_DIR}/cmake/bin:${PATH}
       export CC=${COMPILER_C} CXX=${COMPILER_CXX}
       source /opt/qt511/bin/qt511-env.sh
-    else
-      if ! brew ls --version cmake &>/dev/null; then brew install cmake; fi
-      brew install cppcheck qt
-      brew link --force qt
-      export PATH=/usr/local/opt/qt/bin:${PATH}
-    fi
-  # Install CUDA
-  - |
-    if [[ "$USE_CUDA" == "true" ]]; then
-      export CUDA=10.1.105-1
-      # get cuda-repo-ubuntu1804
-      travis_retry wget http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-repo-ubuntu1804_${CUDA}_amd64.deb
-      travis_retry sudo apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub
-      travis_retry sudo dpkg -i cuda-repo-ubuntu1804_${CUDA}_amd64.deb
-      # install
-      travis_retry sudo apt-get update -qq
-      export CUDA_APT=${CUDA:0:4}
-      export CUDA_APT=${CUDA_APT/./-}
-      travis_retry sudo apt-get install -y cuda-drivers cuda-core-${CUDA_APT} cuda-cudart-dev-${CUDA_APT} cuda-curand-dev-${CUDA_APT} cuda-cufft-dev-${CUDA_APT} --allow-unauthenticated
-      travis_retry sudo apt-get clean
-      # export
-      export CUDA_HOME=/usr/local/cuda-${CUDA:0:4}
-      export LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
-      export PATH=${CUDA_HOME}/bin:${PATH}
-      export CMAKE_OPTIONS="${CMAKE_OPTIONS} -DCMAKE_C_COMPILER=${COMPILER_C} -DCMAKE_CXX_COMPILER=${COMPILER_CXX} -DCUDA_TOOLKIT_ROOT_DIR=${CUDA_HOME}"
-      ls -a ${CUDA_HOME} ${CUDA_HOME}/bin ${CUDA_HOME}/include
-    fi
-
+    
 
 install:
   # Build everything
   - cd ${TRAVIS_BUILD_DIR}
+  - sudo apt-get -qq update
+  - sudo apt-get install -y libassimp-dev libglm-dev graphviz libxcb-dri3-0 libxcb-present0 libpciaccess0 cmake libpng-dev libxcb-dri3-dev libx11-dev libx11-xcb-dev libmirclient-dev libwayland-dev libxrandr-dev
+  - export VK_VERSION=1.2.131.1
+  - wget -O vulkansdk-linux-x86_64-$VK_VERSION.tar.gz https://sdk.lunarg.com/sdk/download/$VK_VERSION/linux/vulkansdk-linux-x86_64-$VK_VERSION.tar.gz
+  - tar zxf vulkansdk-linux-x86_64-$VK_VERSION.tar.gz
+  - export VULKAN_SDK=$TRAVIS_BUILD_DIR/$VK_VERSION/x86_64
   - |
     mkdir -p build
     cd build
@@ -256,11 +194,3 @@ script:
   - if [ "$COVERAGE" == "true" ]; then lcov -a baseline.info -a after_test.info -o total_test.info; fi
   - if [ "$COVERAGE" == "true" ]; then lcov -r total_test.info \*thirdparty\* \*/test/\* \*Collection\* \*DLL_\* -o coverage.info; fi
   - if [ "$COVERAGE" == "true" ]; then bash <(curl -s https://codecov.io/bash) -f coverage.info || echo "Codecov did not collect coverage reports"; fi
-
-  # Run Python coverage report generation and upload to coveralls
-  - cd ../core/python
-  - if [ "$COVERAGE" == "true" ]; then coverage run --source spirit --omit=spirit/spiritlib.py,spirit/collection.py setup.py test > cov.txt; fi
-  - if [ "$COVERAGE" == "true" ]; then head cov.txt; fi
-  - if [ "$COVERAGE" == "true" ]; then coverage report -m; fi
-  - if [ "$COVERAGE" == "true" ]; then coverage xml; fi
-  - if [ "$COVERAGE" == "true" ]; then coveralls; fi

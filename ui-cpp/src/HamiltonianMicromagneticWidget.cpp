@@ -102,7 +102,8 @@ void HamiltonianMicromagneticWidget::updateData()
     this->lineEdit_dmi_01->setText(QString::number(d2[1]));
 	if ((d2[0]!=0)||(d2[1]!=0)) this->checkBox_dmi->setChecked(true);
     else this->checkBox_dmi->setChecked(false);
-
+    Hamiltonian_Get_damping(state.get(), &d, this->comboBox_region->currentIndex());
+    this->lineEdit_damping->setText(QString::number(d));
     Hamiltonian_Get_DDI_coefficient(state.get(), d2, this->comboBox_region->currentIndex());
     this->lineEdit_ddi->setText(QString::number(d2[0]));
     if (d2[1]) this->checkBox_ddi->setChecked(true);
@@ -457,6 +458,40 @@ void HamiltonianMicromagneticWidget::set_dmi()
         }
     }
 }
+void HamiltonianMicromagneticWidget::set_damping()
+{
+    // Closure to set the parameters of a specific spin system
+    auto apply = [this](int idx_image) -> void
+    {
+
+            float alpha;
+            alpha = lineEdit_damping->text().toFloat();
+           
+            Hamiltonian_Set_damping(state.get(), alpha, this->comboBox_region->currentIndex(), idx_image);
+
+
+
+    };
+
+    if (this->comboBox_Hamiltonian_Ani_ApplyTo->currentText() == "Current Image")
+    {
+        apply(System_Get_Index(state.get()));
+    }
+    else if (this->comboBox_Hamiltonian_Ani_ApplyTo->currentText() == "Current Image Chain")
+    {
+        for (int i = 0; i < Chain_Get_NOI(state.get()); ++i)
+        {
+            apply(i);
+        }
+    }
+    else if (this->comboBox_Hamiltonian_Ani_ApplyTo->currentText() == "All Images")
+    {
+        for (int img = 0; img < Chain_Get_NOI(state.get()); ++img)
+        {
+            apply(img);
+        }
+    }
+}
 void HamiltonianMicromagneticWidget::set_ddi_checkBox()
 {
     // Closure to set the parameters of a specific spin system
@@ -650,6 +685,8 @@ void HamiltonianMicromagneticWidget::Setup_Slots()
     // DDI
     connect(this->checkBox_ddi, SIGNAL(stateChanged(int)), this, SLOT(set_ddi_checkBox()));
     connect(this->lineEdit_ddi, SIGNAL(returnPressed()), this, SLOT(set_ddi_lineEdit()));
+    //damping
+    connect(this->lineEdit_damping, SIGNAL(returnPressed()), this, SLOT(set_damping()));
     //frozen_spins
     connect(this->checkBox_frozen_spins, SIGNAL(stateChanged(int)), this, SLOT(set_frozen_spins()));
     

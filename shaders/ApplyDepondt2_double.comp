@@ -71,10 +71,11 @@ shared float sdata[sumSubGroupSize];
 void main() {
 
 	uint id_x=gl_GlobalInvocationID.x;
-	double grad_corr_x=0.5*(grad[id_x]+grad_copy[id_x]);
-	double grad_corr_y=0.5*(grad[id_x+consts.pad]+grad_copy[id_x+consts.pad]);
-	double grad_corr_z=0.5*(grad[id_x+2*consts.pad]+grad_copy[id_x+2*consts.pad]);
-	double grad_norm = sqrt(grad_corr_x*grad_corr_x+grad_corr_y*grad_corr_y+grad_corr_z*grad_corr_z);
+	dvec3 grad_corr;
+	grad_corr.x=0.5*(grad[id_x]+grad_copy[id_x]);
+	grad_corr.y=0.5*(grad[id_x+consts.pad]+grad_copy[id_x+consts.pad]);
+	grad_corr.z=0.5*(grad[id_x+2*consts.pad]+grad_copy[id_x+2*consts.pad]);
+	double grad_norm = length(grad_corr);
 	double gamma_dt= (consts.dt==0) ? 1e-4/gamma_dt_from_torque[0] : consts.dt; 
 	
 	float max=0;
@@ -83,9 +84,9 @@ void main() {
 		double grad_norm_inv=1.0/grad_norm;
 		double q = cosa_11(grad_norm*gamma_dt);
 		double w = 1 - q;
-		double x = -grad_corr_x* grad_norm_inv;
-		double y = -grad_corr_y* grad_norm_inv;
-		double z = -grad_corr_z* grad_norm_inv;
+		double x = -grad_corr.x* grad_norm_inv;
+		double y = -grad_corr.y* grad_norm_inv;
+		double z = -grad_corr.z* grad_norm_inv;
 		double s1 = x * y * w;
 		double s2 = x * z * w;
 		double s3 = z * y * w;
@@ -93,22 +94,21 @@ void main() {
 		double p1 = z * sin_grad;
 		double p2 = y * sin_grad;
 		double p3 = x * sin_grad;
-		double t1, t2, t3;
+		dvec3 t;
 	
-		t1 = (q + x* x * w) * s_copy[id_x] + (s1 - p1) * s_copy[id_x+consts.pad] + (s2 + p2) * s_copy[id_x+2*consts.pad];
-		t2 = (s1 + p1) * s_copy[id_x] + (q + y * y * w) * s_copy[id_x+consts.pad] + (s3 - p3) * s_copy[id_x+2*consts.pad];
-		t3 = (s2 - p2) * s_copy[id_x] + (s3 + p3) * s_copy[id_x+consts.pad] + (q + z * z * w) * s_copy[id_x+2*consts.pad];
-		//temp_x=s_copy[id_x]-t1;
-		//temp_y=s_copy[id_x+consts.pad]-t2;
-		//temp_z=s_copy[id_x+2*consts.pad]-t3;
-		s[id_x] =  float(t1);
-		s[id_x+consts.pad] = float(t2);
-		s[id_x+2*consts.pad] = float(t3);
+		t.x = (q + x* x * w) * s_copy[id_x] + (s1 - p1) * s_copy[id_x+consts.pad] + (s2 + p2) * s_copy[id_x+2*consts.pad];
+		t.y = (s1 + p1) * s_copy[id_x] + (q + y * y * w) * s_copy[id_x+consts.pad] + (s3 - p3) * s_copy[id_x+2*consts.pad];
+		t.z = (s2 - p2) * s_copy[id_x] + (s3 + p3) * s_copy[id_x+consts.pad] + (q + z * z * w) * s_copy[id_x+2*consts.pad];
+		t=normalize(t);
+
+		s[id_x] =  float(t.x);
+		s[id_x+consts.pad] = float(t.y);
+		s[id_x+2*consts.pad] = float(t.z);
 		
-		float temp_x=grad[id_x]-grad_copy[id_x];
+		/*float temp_x=grad[id_x]-grad_copy[id_x];
 		float temp_y=grad[id_x+consts.pad]-grad_copy[id_x+consts.pad];
 		float temp_z=grad[id_x+2*consts.pad]-grad_copy[id_x+2*consts.pad];
-		
+		*/
 		//float max = temp_x*temp_x+temp_y*temp_y+temp_z*temp_z;
 		max = float(grad_norm);//sqrt(temp_x*temp_x+temp_y*temp_y+temp_z*temp_z);
 	};

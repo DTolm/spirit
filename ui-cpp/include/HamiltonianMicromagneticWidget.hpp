@@ -35,6 +35,7 @@ private slots:
 
     void set_exchange();
     void set_dmi();
+    void set_damping();
     void set_ddi_checkBox();
     void set_ddi_lineEdit();
     void set_frozen_spins();

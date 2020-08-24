@@ -1476,6 +1476,7 @@ namespace IO
             myfile.Read_Single(launchConfiguration.GPU_ID, "GPU_ID");
             myfile.Read_Single(launchConfiguration.savePeriod, "save_period");
             myfile.Read_Single(launchConfiguration.groupedIterations, "grouped_iterations");
+            myfile.Read_Single(launchConfiguration.maxTorque, "max_torque");
             std::string double_precision_rotate;
             myfile.Read_String(double_precision_rotate, "double_precision_rotate");
             if (double_precision_rotate == "ON")
@@ -1591,7 +1592,7 @@ namespace IO
             myfile.Read_Single(spatial_gradient_order, "spatial_gradient_order");
             myfile.Read_Single(launchConfiguration.max_move, "max_move");
 
-            launchConfiguration.max_move = 3.14159265358979 / launchConfiguration.max_move;
+            //launchConfiguration.max_move = 3.14159265358979 / launchConfiguration.max_move;
             myfile.Read_Single(launchConfiguration.n_lbfgs_memory, "n_lbfgs");
             // Field
             //external_field_magnitude=scalarfield(region_num,0);

@@ -136,14 +136,17 @@ void ControlWidget::cycleSolver()
 }
 void ControlWidget::setSolver(std::string SolverName)
 {
-    if (SolverName == "RK4")
-        this->comboBox_Solver->setCurrentIndex(3);
+    this->comboBox_Method->setCurrentIndex(0);
     if (SolverName == "Depondt")
-        this->comboBox_Solver->setCurrentIndex(2);
+        this->comboBox_Solver->setCurrentIndex(0);
+    if (SolverName == "RK4")
+        this->comboBox_Solver->setCurrentIndex(1);
     if (SolverName == "LBFGS_OSO")
-        this->comboBox_Solver->setCurrentIndex(5);
+        this->comboBox_Solver->setCurrentIndex(2);
     if (SolverName == "VP_OSO")
-        this->comboBox_Solver->setCurrentIndex(7);
+        this->comboBox_Solver->setCurrentIndex(3);
+    if (SolverName == "CG_OSO")
+        this->comboBox_Solver->setCurrentIndex(4);
 }
 std::string ControlWidget::methodName()
 {
@@ -184,7 +187,9 @@ void ControlWidget::play_pause()
         solver = Solver_LBFGS_OSO;
     else if( s_solver == "LBFGS_Atlas" )
         solver = Solver_LBFGS_Atlas;
-    if( s_solver == "VP_OSO" )
+    else if (s_solver == "CG_OSO")
+        solver = Solver_CG_OSO;
+    else if( s_solver == "VP_OSO" )
         solver = Solver_VP_OSO;
 
     if( Simulation_Running_On_Image(this->state.get()) ||

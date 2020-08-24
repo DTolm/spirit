@@ -144,7 +144,7 @@
    <item row="0" column="8">
     <layout class="QGridLayout" name="gridLayout_11">
      <property name="horizontalSpacing">
-      <number>-1</number>
+      <number>6</number>
      </property>
      <property name="verticalSpacing">
       <number>0</number>
@@ -300,18 +300,8 @@
         </size>
        </property>
        <property name="currentText">
-        <string>SIB</string>
+        <string>Depondt</string>
        </property>
-       <item>
-        <property name="text">
-         <string>SIB</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>Heun</string>
-        </property>
-       </item>
        <item>
         <property name="text">
          <string>Depondt</string>
@@ -324,22 +314,17 @@
        </item>
        <item>
         <property name="text">
-         <string>VP</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
          <string>LBFGS_OSO</string>
         </property>
        </item>
        <item>
         <property name="text">
-         <string>LBFGS_Atlas</string>
+         <string>VP_OSO</string>
         </property>
        </item>
        <item>
         <property name="text">
-         <string>VP_OSO</string>
+         <string>CG_OSO</string>
         </property>
        </item>
       </widget>
@@ -353,31 +338,11 @@
         </size>
        </property>
        <property name="currentText">
-        <string>MC</string>
+        <string>LLG</string>
        </property>
        <item>
         <property name="text">
-         <string>MC</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
          <string>LLG</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>GNEB</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>MMF</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>EMA</string>
         </property>
        </item>
       </widget>

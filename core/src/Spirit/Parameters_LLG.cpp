@@ -631,3 +631,243 @@ void Parameters_LLG_Get_STT( State *state, bool * use_gradient, float * magnitud
         spirit_handle_exception_api(idx_image, idx_chain);
     }
 }
+
+//micromagnetics functions
+
+void Parameters_LLG_Set_dt(State* state, float dt, int idx_image, int idx_chain) noexcept
+{
+    try
+    {
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
+
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        image->app.launchConfiguration.gamma= dt * 0.176085964411;
+        image->app.init_solver(image->app.launchConfiguration.solver_type);
+
+        Log(Utility::Log_Level::Info, Utility::Log_Sender::API,
+            fmt::format("Set: LLG time step = {}", dt), idx_image, idx_chain);
+    }
+    catch (...)
+    {
+        spirit_handle_exception_api(idx_image, idx_chain);
+    }
+}
+void Parameters_LLG_Set_max_torque(State* state, float maxTorque, int idx_image, int idx_chain) noexcept
+{
+    try
+    {
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
+
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        image->app.launchConfiguration.maxTorque = maxTorque;
+        image->app.init_solver(image->app.launchConfiguration.solver_type);
+
+        Log(Utility::Log_Level::Info, Utility::Log_Sender::API,
+            fmt::format("Set: LLG max torque = {}", maxTorque), idx_image, idx_chain);
+    }
+    catch (...)
+    {
+        spirit_handle_exception_api(idx_image, idx_chain);
+    }
+}
+void Parameters_LLG_Set_max_move(State* state, float max_move, int idx_image, int idx_chain) noexcept
+{
+    try
+    {
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
+
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        image->app.launchConfiguration.max_move = max_move;
+        image->app.init_solver(image->app.launchConfiguration.solver_type);
+
+        Log(Utility::Log_Level::Info, Utility::Log_Sender::API,
+            fmt::format("Set: LLG max move for LBFGS = {}", max_move), idx_image, idx_chain);
+    }
+    catch (...)
+    {
+        spirit_handle_exception_api(idx_image, idx_chain);
+    }
+}
+
+void Parameters_LLG_Set_n_LBFGS(State* state, int n_LBFGS, int idx_image, int idx_chain) noexcept
+{
+    try
+    {
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
+
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        image->app.launchConfiguration.n_lbfgs_memory = n_LBFGS;
+        image->app.init_solver(image->app.launchConfiguration.solver_type);
+
+        Log(Utility::Log_Level::Info, Utility::Log_Sender::API,
+            fmt::format("Set: LLG number of stored steps for LBFGS = {}", n_LBFGS), idx_image, idx_chain);
+    }
+    catch (...)
+    {
+        spirit_handle_exception_api(idx_image, idx_chain);
+    }
+}
+void Parameters_LLG_Set_grouped_iterations(State* state, int grouped_iterations, int idx_image, int idx_chain) noexcept
+{
+    try
+    {
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
+
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        image->app.launchConfiguration.groupedIterations = grouped_iterations;
+        image->app.init_solver(image->app.launchConfiguration.solver_type);
+
+        Log(Utility::Log_Level::Info, Utility::Log_Sender::API,
+            fmt::format("Set: {} grouped iterations to perform them in one batch", grouped_iterations), idx_image, idx_chain);
+    }
+    catch (...)
+    {
+        spirit_handle_exception_api(idx_image, idx_chain);
+    }
+}
+
+void Parameters_LLG_Set_save_period(State* state, int save_period, int idx_image, int idx_chain) noexcept
+{
+    try
+    {
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
+
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        image->app.launchConfiguration.savePeriod = save_period;
+        image->app.init_solver(image->app.launchConfiguration.solver_type);
+
+        Log(Utility::Log_Level::Info, Utility::Log_Sender::API,
+            fmt::format("Set: save state after every {} batches", save_period), idx_image, idx_chain);
+    }
+    catch (...)
+    {
+        spirit_handle_exception_api(idx_image, idx_chain);
+    }
+}
+
+void Parameters_LLG_Get_dt(State* state, float* dt, int idx_image, int idx_chain) noexcept
+{
+    try
+    {
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
+
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        *dt = (float)image->app.launchConfiguration.gamma/ 0.176085964411;
+
+    }
+    catch (...)
+    {
+        spirit_handle_exception_api(idx_image, idx_chain);
+    }
+}
+void Parameters_LLG_Get_max_torque(State* state, float* maxTorque, int idx_image, int idx_chain) noexcept
+{
+    try
+    {
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
+
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        *maxTorque = (float)image->app.launchConfiguration.maxTorque;
+
+    }
+    catch (...)
+    {
+        spirit_handle_exception_api(idx_image, idx_chain);
+    }
+}
+void Parameters_LLG_Get_max_move(State* state, float* max_move,  int idx_image, int idx_chain) noexcept
+{
+    try
+    {
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
+
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        *max_move = (float)image->app.launchConfiguration.max_move;
+
+    }
+    catch (...)
+    {
+        spirit_handle_exception_api(idx_image, idx_chain);
+    }
+}
+void Parameters_LLG_Get_n_LBFGS(State* state, int* n_LBFGS,  int idx_image, int idx_chain) noexcept
+{
+    try
+    {
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
+
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        *n_LBFGS = (int)image->app.launchConfiguration.n_lbfgs_memory;
+
+    }
+    catch (...)
+    {
+        spirit_handle_exception_api(idx_image, idx_chain);
+    }
+}
+void Parameters_LLG_Get_grouped_iterations(State* state, int* grouped_iterations,int idx_image, int idx_chain) noexcept
+{
+    try
+    {
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
+
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        *grouped_iterations = (int)image->app.launchConfiguration.groupedIterations;
+
+    }
+    catch (...)
+    {
+        spirit_handle_exception_api(idx_image, idx_chain);
+    }
+}
+void Parameters_LLG_Get_save_period(State* state, int* save_period, int idx_image, int idx_chain) noexcept
+{
+    try
+    {
+        std::shared_ptr<Data::Spin_System> image;
+        std::shared_ptr<Data::Spin_System_Chain> chain;
+
+        // Fetch correct indices and pointers
+        from_indices(state, idx_image, idx_chain, image, chain);
+
+        *save_period = (int)image->app.launchConfiguration.savePeriod;
+
+    }
+    catch (...)
+    {
+        spirit_handle_exception_api(idx_image, idx_chain);
+    }
+}

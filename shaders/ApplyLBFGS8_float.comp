@@ -39,47 +39,54 @@ layout(push_constant) uniform PushConsts
   uint k;
   float max_move;
 } consts;
-shared float sdata[sumSubGroupSize];
+//shared float sdata[sumSubGroupSize];
 
 void main() {
 
 	float theta_rms=sqrt(reduceResults[0]/consts.nos);
 	float scaling = (theta_rms>maxmove[1]) ? maxmove[1]/theta_rms : 1.0;
 	uint id_x=gl_GlobalInvocationID.x;
-	s_copy[id_x]=s[id_x];
-	s_copy[id_x+consts.pad]=s[id_x+consts.pad];
-	s_copy[id_x+2*consts.pad]=s[id_x+2*consts.pad];
-	sd[id_x]*=scaling;
-	sd[id_x+consts.pad]*=scaling;
-	sd[id_x+2*consts.pad]*=scaling;
-	//float temp_x=0;
-	//float temp_y=0;
-	//float temp_z=0;
-	//float s_norm=1.0;
-	float theta = sqrt(sd[id_x]*sd[id_x]+sd[id_x+consts.pad]*sd[id_x+consts.pad]+sd[id_x+2*consts.pad]*sd[id_x+2*consts.pad]);
+	vec3 s_loc;
+	s_loc.x=s[id_x];
+	s_loc.y=s[id_x+consts.pad];
+	s_loc.z=s[id_x+2*consts.pad];
+	s_copy[id_x]=s_loc.x;
+	s_copy[id_x+consts.pad]=s_loc.y;
+	s_copy[id_x+2*consts.pad]=s_loc.z;
+	vec3 sd_loc;
+	sd_loc.x=sd[id_x];
+	sd_loc.y=sd[id_x+consts.pad];
+	sd_loc.z=sd[id_x+2*consts.pad];
+	sd_loc*=scaling;
+	//sd[id_x]=sd_loc.x;
+	//sd[id_x+consts.pad]=sd_loc.y;
+	//sd[id_x+2*consts.pad]=sd_loc.z;
+
+	float theta = length(sd_loc);
 	if (theta > 1.0e-20) // if theta is too small we do nothing
 	{
 		float theta_inv = 1.0/theta;
 		float q = cos(theta);
 		float w = 1 - q;
-		float x = -sd[id_x]* theta_inv;
-		float y = -sd[id_x+consts.pad]* theta_inv;
-		float z = -sd[id_x+2*consts.pad]* theta_inv;
+		float x = -sd_loc.x* theta_inv;
+		float y = -sd_loc.y* theta_inv;
+		float z = -sd_loc.z* theta_inv;
 		float s1 = x * y * w;
 		float s2 = x * z * w;
 		float s3 = z * y * w;
-		float p1 = z * sin(theta);
-		float p2 = y * sin(theta);
-		float p3 = x * sin(theta);
-		float t1, t2, t3;
+		float sin_theta=sin(theta);
+		float p1 = z * sin_theta;
+		float p2 = y * sin_theta;
+		float p3 = x * sin_theta;
+		vec3 t;
 	
-		t1 = (q + x* x * w) * s[id_x] + (s1 - p1) * s[id_x+consts.pad] + (s2 + p2) * s[id_x+2*consts.pad];
-		t2 = (s1 + p1) * s[id_x] + (q + y * y * w) * s[id_x+consts.pad] + (s3 - p3) * s[id_x+2*consts.pad];
-		t3 = (s2 - p2) * s[id_x] + (s3 + p3) * s[id_x+consts.pad] + (q + z * z * w) * s[id_x+2*consts.pad];
-		
-		s[id_x] = t1;
-		s[id_x+consts.pad] = t2;
-		s[id_x+2*consts.pad] = t3;
+		t.x = (q + x* x * w) * s_loc.x + (s1 - p1) * s_loc.y + (s2 + p2) * s_loc.z;
+		t.y = (s1 + p1) * s_loc.x + (q + y * y * w) * s_loc.y + (s3 - p3) * s_loc.z;
+		t.z = (s2 - p2) * s_loc.x + (s3 + p3) * s_loc.y + (q + z * z * w) * s_loc.z;
+		t=normalize(t);
+		s[id_x] = t.x;
+		s[id_x+consts.pad] = t.y;
+		s[id_x+2*consts.pad] = t.z;
 	};
 	
 	if (gl_LocalInvocationID.x==gl_WorkGroupSize.x-1)
