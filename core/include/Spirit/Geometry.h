@@ -6,7 +6,7 @@ struct State;
 
 #include "Spirit_Defines.h"
 #include <vector>
-
+#include <array>
 /*
 Geometry
 ====================================================================
