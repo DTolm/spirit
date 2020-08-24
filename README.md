@@ -9,7 +9,7 @@ Peter Grünberg Institute and Institute for Advanced Simulation, Forschungszentr
 
 Vulkan Spirit requires installation of Vulkan SDK with a minimal version of 1.1. It can be launched on any modern GPU - including Nvidia, AMD and Intel iGPU. By utilizing the Vulkan-optimized library VkFFT (https://github.com/DTolm/VkFFT), also developed by Tolmachev Dmitrii, Vulkan Spirit achieves 2x-3x computational speed increase over mumax3 package. More information on implementation and optimizations can be found in my Master thesis, for which contact me by email (d.tolmachev@fz-juelich.de, dtolm96@gmail.com).
 
-Currently working:
+Currently working:\
 -GPU micromagnetic simulations: \
   -LLG solvers: RK4, Depondt\
   -minimizers: VP-OSO, LBFGS-OSO, CG-OSO\
