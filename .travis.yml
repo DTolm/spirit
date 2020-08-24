@@ -117,7 +117,7 @@ before_install:
   - |
     DEPS_DIR="${TRAVIS_BUILD_DIR}/deps"
     mkdir -p ${DEPS_DIR} && cd ${DEPS_DIR}
-    CMAKE_URL="http://www.cmake.org/files/v3.5/cmake-3.5.2-Linux-x86_64.tar.gz"
+    CMAKE_URL="http://www.cmake.org/files/v3.11/cmake-3.11.0-Linux-x86_64.tar.gz"
     mkdir cmake && travis_retry wget --no-check-certificate --quiet -O - ${CMAKE_URL} | tar --strip-components=1 -xz -C cmake
     export PATH=${DEPS_DIR}/cmake/bin:${PATH}
     export CC=${COMPILER_C} CXX=${COMPILER_CXX}
