@@ -1,18 +1,43 @@
 SPIRIT
 =============================
 **SPIN SIMULATION FRAMEWORK**<br />
+linux build:
+[![Build Status](https://travis-ci.com/DTolm/spirit.svg?branch=master)](https://travis-ci.com/DTolm/spirit)
+
 This repository contains experimental micromagnetic version of Vulkan Spirit developed by Tolmachev Dmitrii.
 Peter Grünberg Institute and Institute for Advanced Simulation, Forschungszentrum Jülich, D-52425 Jülich, Germany
 
-Vulkan Spirit requires installation of Vulkan SDK (https://vulkan.lunarg.com/) with a minimal version of 1.1. It can be launched on any modern GPU - including Nvidia, AMD and Intel iGPU. By utilizing the Vulkan-optimized library VkFFT (https://github.com/DTolm/VkFFT), also developed by Tolmachev Dmitrii, Vulkan Spirit achieves 2x-3x computational speed increase over mumax3 package. More information on implementation and optimizations can be found in my Master thesis, for which contact me by email (d.tolmachev@fz-juelich.de, dtolm96@gmail.com).
+Vulkan Spirit requires installation of Vulkan SDK with a minimal version of 1.1. It can be launched on any modern GPU - including Nvidia, AMD and Intel iGPU. By utilizing the Vulkan-optimized library VkFFT (https://github.com/DTolm/VkFFT), also developed by Tolmachev Dmitrii, Vulkan Spirit achieves 2x-3x computational speed increase over mumax3 package. More information on implementation and optimizations can be found in my Master thesis, for which contact me by email (d.tolmachev@fz-juelich.de, dtolm96@gmail.com).
 
-Standard problems check: (https://github.com/dtolm/Spirit/blob/master/Vulkan_Spirit_standard_problems.pdf)
+Currently working:
+-GPU micromagnetic simulations: 
+  -LLG solvers: RK4, Depondt
+  -minimizers: VP-OSO, LBFGS-OSO, CG-OSO
+-gradient components: Exchange, DMI(bulk, interface), anisotropy(uniaxial, cubic), Zeeman, DDI
+-regions with different parameters, periodic/open boundary conditions, freezing spins
+-passing standard problems #1-#4
+-Qt GUI - almost every parameter can be adjusted from there
 
-This section will be restructured later.
+Not working yet (compared to current Spirit release version):
+-Methods, other than LLG
+-images and chains - one simulation/one Spirit instance. Can specify at which GPU to run in config
+-python bindings - use main.cpp in ui-cpp folder. Regions can also be defined from there.
+-regions definition from GUI
+-STT and temperature effects
+-OSX 
+
+How to install:
+-install CMake (>=3.11)
+-install [Vulkan SDK](https://vulkan.lunarg.com/) (>=1.1)
+-install Qt (Qt >= 5.7 (including qt-charts); OpenGL drivers >= 3.3)
+-follow core library instructions for [Linux](https://github.com/DTolm/spirit/blob/master/docs/Build_Unix_OSX.md) or [Windows](https://github.com/DTolm/spirit/blob/master/docs/Build_Windows.md)
+
+Standard problems check: https://github.com/dtolm/Spirit/blob/master/Vulkan_Spirit_standard_problems.pdf
 
 Performance benchmark:
 ![alt text](https://github.com/dtolm/Spirit/blob/master/mumax_comparison.png?raw=true)
 
+Below are the contents of old readme file. 
 ![Logo](https://imgur.com/iWc1kuE.png "Spirit Logo")
 
 &nbsp;
