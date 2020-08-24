@@ -138,7 +138,7 @@ install:
     cd build
     cmake ${CMAKE_OPTIONS} ..
     cd ..
-  - if [ "$USE_CUDA" != "true" ]; then ./make.sh -j2; else ./make.sh; fi
+  - ./make.sh
 
 
 before_script:
