@@ -103,9 +103,10 @@ int main(int argc, char ** argv)
     }
     Hamiltonian_Set_Regions(state.get(), regions.data());*/
 
-
-     float dir[3] = { 0,1,0};
-     Configuration_Domain(state.get(), dir);
+     Configuration_PlusZ(state.get());
+     Configuration_Skyrmion(state.get(), 50.0, 1.0, 0, false, false, false);
+    // float dir[3] = { 0,1,0};
+     //Configuration_Domain(state.get(), dir);
      //Configuration_APStripe(state.get());
 
      //Configuration_Vortex(state.get(), 1000.0, 1.0, 0, false, false, false);
