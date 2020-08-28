@@ -1,8 +1,6 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-#define WORKGROUP_SIZE 32
-
 struct Region{
   float Ms;
   float Ms_inv;
@@ -26,43 +24,46 @@ struct Region{
   float periodic[3];
   float frozen_spins;
 };
-layout (local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = 1 ) in;
+layout (local_size_x_id = 1, local_size_y_id = 2, local_size_z_id = 3) in;
+layout (constant_id = 4) const uint WIDTH = 1;
+layout (constant_id = 5) const uint HEIGHT = 1;
+layout (constant_id = 6) const uint DEPTH = 1;
+layout (constant_id = 7) const uint pad = 1;
 
-layout(binding = 0) uniform UBO {
-    uint WIDTH;
-    uint HEIGHT;
-    uint DEPTH;
-    uint n;
-};
 
-layout(binding = 1) readonly buffer DataIn
+layout(binding = 0) readonly buffer DataIn
 {
    float datain [];
 };
 
-layout(binding = 2) writeonly buffer DataOut
+layout(binding = 1) writeonly buffer DataOut
 {
    float dataout [];
 };
-layout(binding = 3) readonly buffer Regions_Book
+layout(binding = 2) readonly buffer Regions_Book
 {
    Region regions_book[];
 };
-layout(binding = 4) readonly buffer Regions_Buf
+layout(binding = 3) readonly buffer Regions_Buf
 {
    int regions[];
 };
 void main() {
-    uint id_in=3*(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * WIDTH + gl_GlobalInvocationID.z * WIDTH * HEIGHT );
-	uint id_out=(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * WIDTH + gl_GlobalInvocationID.z * WIDTH * HEIGHT );
-	if (regions_book[regions[gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * WIDTH + gl_GlobalInvocationID.z * WIDTH * HEIGHT]].Ms==0){
+	uint z = gl_GlobalInvocationID.x/WIDTH/HEIGHT;
+	uint y = (gl_GlobalInvocationID.x- z *HEIGHT*WIDTH)/WIDTH;
+	uint x = gl_GlobalInvocationID.x- z  *HEIGHT*WIDTH - y*WIDTH;
+
+	uint id_out=gl_GlobalInvocationID.x;
+    uint id_in=3*(id_out);
+
+	if (regions_book[regions[id_out]].Ms==0){
 		dataout[id_out]=0;
-		dataout[id_out+n]=0;
-		dataout[id_out+2*n]=0;
+		dataout[id_out+pad]=0;
+		dataout[id_out+2*pad]=0;
 	}else{
 		dataout[id_out]=datain[id_in];
-		dataout[id_out+n]=datain[id_in+1];
-		dataout[id_out+2*n]=datain[id_in+2];
+		dataout[id_out+pad]=datain[id_in+1];
+		dataout[id_out+2*pad]=datain[id_in+2];
 	}
 
 }

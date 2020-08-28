@@ -89,9 +89,9 @@ void main() {
 	sd_loc.x=sd[id_x]*scaling;
 	sd_loc.y=sd[id_x+consts.pad]*scaling;
 	sd_loc.z=sd[id_x+2*consts.pad]*scaling;
-	sd[id_x]=float(sd_loc.x);
-	sd[id_x+consts.pad]=float(sd_loc.y);
-	sd[id_x+2*consts.pad]=float(sd_loc.z);
+	//sd[id_x]=float(sd_loc.x);
+	//sd[id_x+consts.pad]=float(sd_loc.y);
+	//sd[id_x+2*consts.pad]=float(sd_loc.z);
 	double theta = length(sd_loc);
 	if (theta > 1.0e-20) // if theta is too small we do nothing
 	{
@@ -112,6 +112,7 @@ void main() {
 		t.x = (q + x* x * w) * s_loc.x + (s1 - p1) * s_loc.y + (s2 + p2) * s_loc.z;
 		t.y = (s1 + p1) * s_loc.x + (q + y * y * w) * s_loc.y + (s3 - p3) * s_loc.z;
 		t.z = (s2 - p2) * s_loc.x + (s3 + p3) * s_loc.y + (q + z * z * w) * s_loc.z;
+		t=normalize(t);
 		s[id_x] =float(t.x);//scaling;//sd[id_x];//t1;
 		s[id_x+consts.pad] = float(t.y);//iteration[gl_WorkGroupID.x];//sd[id_x+consts.pad];// t2;
 		s[id_x+2*consts.pad] =float(t.z);//sd[id_x+consts.pad*2];//t3;

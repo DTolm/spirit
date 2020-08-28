@@ -1,31 +1,30 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-#define WORKGROUP_SIZE 32
-layout (local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = 1 ) in;
+layout (local_size_x_id = 1, local_size_y_id = 2, local_size_z_id = 3) in;
+layout (constant_id = 4) const uint WIDTH = 1;
+layout (constant_id = 5) const uint HEIGHT = 1;
+layout (constant_id = 6) const uint DEPTH = 1;
+layout (constant_id = 7) const uint pad = 1;
 
-layout(binding = 0) uniform UBO {
-    uint WIDTH;
-    uint HEIGHT;
-    uint DEPTH;
-    uint n;
-};
-
-layout(binding = 1) readonly buffer DataIn
+layout(binding = 0) readonly buffer DataIn
 {
    float datain [];
 };
 
-layout(binding = 2) writeonly buffer DataOut
+layout(binding = 1) writeonly buffer DataOut
 {
    float dataout [];
 };
 void main() {
+	uint z = gl_GlobalInvocationID.x/WIDTH/HEIGHT;
+	uint y = (gl_GlobalInvocationID.x- z *HEIGHT*WIDTH)/WIDTH;
+	uint x = gl_GlobalInvocationID.x- z  *HEIGHT*WIDTH - y*WIDTH;
+	uint id_in=gl_GlobalInvocationID.x;
+	uint id_out=3*(id_in);
 	
-	uint id_in=(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * WIDTH + gl_GlobalInvocationID.z * WIDTH * HEIGHT );
-	uint id_out=3*(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * WIDTH + gl_GlobalInvocationID.z * WIDTH * HEIGHT );
 	dataout[id_out]=datain[id_in];
-	dataout[id_out+1]=datain[id_in+n];
-	dataout[id_out+2]=datain[id_in+2*n];
+	dataout[id_out+1]=datain[id_in+pad];
+	dataout[id_out+2]=datain[id_in+2*pad];
 
 }

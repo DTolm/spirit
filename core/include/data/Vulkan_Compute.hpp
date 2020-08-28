@@ -165,11 +165,17 @@ namespace VulkanCompute
 	} VulkanLBFGS;
 
 	typedef struct {
+		uint32_t localSize[3];
 		uint32_t WIDTH;
 		uint32_t HEIGHT;
 		uint32_t DEPTH;
-		uint32_t n;
-	} VulkanDimensions;
+		uint32_t pad;
+		uint32_t num_components_write = 1;
+		uint32_t sumSubGroupSize=32;
+		VkBool32 ddi_bool = false;
+		VkBool32 damping = false;
+		VkBool32 save_energy = false;
+	} VulkanGradientSpecializationConstants;
 
 	class ComputeApplication {
 	private:
@@ -182,6 +188,7 @@ namespace VulkanCompute
 		void* mapReduce;
 		regionbook regions_book_local;
 
+		VulkanGradientSpecializationConstants gradientSpecializationConstants;
 		VkInstance instance = {};
 		VkDebugReportCallbackEXT debugReportCallback = {};
 		VkPhysicalDevice physicalDevice = {};
@@ -225,7 +232,6 @@ namespace VulkanCompute
 		VkBuffer bufferRegions;
 		VkBuffer kernel;
 		VkBuffer bufferFFT;
-		VkBuffer uboDimensions;
 		VkDeviceMemory bufferMemorySpins;
 		VkDeviceMemory bufferMemoryGradient;
 		VkDeviceMemory bufferMemoryStagingSpins;
@@ -237,7 +243,6 @@ namespace VulkanCompute
 		VkDeviceMemory bufferMemoryRegions;
 		VkDeviceMemory bufferMemoryKernel;
 		VkDeviceMemory bufferMemoryFFT;
-		VkDeviceMemory uboMemoryDimensions;
 		VkDeviceSize bufferSizeSpins;
 		VkDeviceSize bufferSizeGradient;
 		VkDeviceSize bufferSizeStagingSpins;
@@ -247,7 +252,7 @@ namespace VulkanCompute
 		VkDeviceSize bufferSizeRegions;
 		VkDeviceSize bufferSizeKernel;
 		VkDeviceSize bufferSizeFFT;
-		VkDeviceSize uboSizeDimensions;
+
 
 		VulkanCollection collectionGradients_noDDI_nosave;
 		VulkanCollection collectionGradients_noDDI_save;
@@ -593,7 +598,7 @@ namespace VulkanCompute
 			bufferSizeEnergy = 2*sizeof(scalar) * SIZES[0] * SIZES[1] * SIZES[2];
 			bufferSizeRegions_Book = sizeof(Regionvalues) * region_num;
 			bufferSizeRegions = sizeof(int) * SIZES[0] * SIZES[1] * SIZES[2];
-			uboSizeDimensions = sizeof(VulkanDimensions);
+			bufferSizeRegions = sizeof(int) * SIZES[0] * SIZES[1] * SIZES[2];
 			
 			allocateBuffer(&bufferSpins, &bufferMemorySpins, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_HEAP_DEVICE_LOCAL_BIT, bufferSizeSpins);
 			allocateBuffer(&bufferSpinsInit, &bufferMemorySpinsInit, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_HEAP_DEVICE_LOCAL_BIT, bufferSizeSpins);
@@ -612,8 +617,7 @@ namespace VulkanCompute
 			allocateBuffer(&bufferGradientOut, &bufferMemoryGradientOut, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_HEAP_DEVICE_LOCAL_BIT, num_components * bufferSizeGradient);
 			allocateBuffer(&bufferRegions_Book, &bufferMemoryRegions_Book, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_HEAP_DEVICE_LOCAL_BIT, bufferSizeRegions_Book);
 			allocateBuffer(&bufferRegions, &bufferMemoryRegions, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_HEAP_DEVICE_LOCAL_BIT, bufferSizeRegions);
-			allocateBuffer(&uboDimensions, &uboMemoryDimensions, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_HEAP_DEVICE_LOCAL_BIT, uboSizeDimensions);
-
+			
 			bufferSizeStagingSpins = bufferSizeSpins;
 			bufferSizeStagingGradient= num_components * bufferSizeGradient;
 
@@ -622,8 +626,8 @@ namespace VulkanCompute
 
 			initReduceBuffers(&vulkanReduce);
 
-			createComputeGradients_noDDI(&collectionGradients_noDDI_nosave, 0);
-			createComputeGradients_noDDI(&collectionGradients_noDDI_save, 1);
+			createComputeGradients_noDDI(&collectionGradients_noDDI_nosave, false);
+			createComputeGradients_noDDI(&collectionGradients_noDDI_save, true);
 			createReadSpins(&collectionReadSpins);
 			createWriteGradient(&collectionWriteGradient);
 			createWriteSpins(&collectionWriteSpins);
@@ -631,13 +635,6 @@ namespace VulkanCompute
 			if (launchConfiguration.DDI == true) {
 				allocate_DDI();
 			}
-
-			VulkanDimensions ubo;
-			ubo.WIDTH = SIZES[0];
-			ubo.HEIGHT = SIZES[1];
-			ubo.DEPTH = SIZES[2];
-			ubo.n = SIZES[0] * SIZES[1] * SIZES[2];
-			transferDataFromCPU(&ubo, sizeof(VulkanDimensions), &uboDimensions);
 
 			updateRegions(regions.data());
 			updateRegionsBook(regions_book, region_num);
@@ -1091,13 +1088,11 @@ namespace VulkanCompute
 			return MaxForce;
 		}
 		
-		void createComputeGradients_noDDI(VulkanCollection* collection, uint32_t save_energy) {
+		void createComputeGradients_noDDI(VulkanCollection* collection, VkBool32 save_energy) {
 			{
-				VkDescriptorPoolSize descriptorPoolSize[2] = { };
-				descriptorPoolSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				descriptorPoolSize[0].descriptorCount = 1;
-				descriptorPoolSize[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				descriptorPoolSize[1].descriptorCount = 6;
+				VkDescriptorPoolSize descriptorPoolSize[1] = { };
+				descriptorPoolSize[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				descriptorPoolSize[0].descriptorCount = 6;
 				//collection->descriptorNum = 6;
 
 				VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
@@ -1107,19 +1102,12 @@ namespace VulkanCompute
 				descriptorPoolCreateInfo.maxSets = 1;
 				vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, NULL, &collection[0].descriptorPool);
 			}
-			uint32_t ddi_bool=1;
-			uint32_t damping = 1;
-			if (launchConfiguration.DDI == true)
-				ddi_bool = 1;
-			else
-				ddi_bool = 0;
-			if (launchConfiguration.damping == true)
-				damping = 1;
-			else
-				damping = 0;
+
+			gradientSpecializationConstants.damping = launchConfiguration.damping;
+			gradientSpecializationConstants.ddi_bool = launchConfiguration.DDI;
 			
 			{
-				const VkDescriptorType descriptorType[] = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
+				const VkDescriptorType descriptorType[] = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
 				collection[0].descriptorSetLayouts = (VkDescriptorSetLayout*)malloc(sizeof(VkDescriptorSetLayout));
 				collection[0].descriptorSets = (VkDescriptorSet*)malloc(sizeof(VkDescriptorSet));
 				collection->descriptorNum = 1;
@@ -1164,16 +1152,11 @@ namespace VulkanCompute
 						descriptorBufferInfo.range = bufferSizeRegions;
 					}
 					if (i == 4) {
-						descriptorBufferInfo.buffer = uboDimensions;
-						descriptorBufferInfo.offset = 0;
-						descriptorBufferInfo.range = sizeof(VulkanDimensions);
-					}
-					if (i == 5) {
 						descriptorBufferInfo.buffer = vulkanReduce.buffer[0];
 						descriptorBufferInfo.offset = 0;
 						descriptorBufferInfo.range = 9 * vulkanReduce.sizesMax[0] * sizeof(float);
 					}
-					if (i == 6) {
+					if (i == 5) {
 						descriptorBufferInfo.buffer = bufferEnergy;
 						descriptorBufferInfo.offset = 0;
 						descriptorBufferInfo.range = bufferSizeEnergy;
@@ -1199,29 +1182,28 @@ namespace VulkanCompute
 				vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, NULL, &collection[0].pipelineLayout);
 				VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo = { };
 				VkComputePipelineCreateInfo computePipelineCreateInfo = { };
-				
-				uint32_t specialization[5] = { 32, num_components, ddi_bool, damping, save_energy};
-				std::array<VkSpecializationMapEntry, 5	> specializationMapEntries;
-				specializationMapEntries[0].constantID = 1;
-				specializationMapEntries[0].size = sizeof(uint32_t);
-				specializationMapEntries[0].offset = 0;
-				specializationMapEntries[1].constantID = 2;
-				specializationMapEntries[1].size = sizeof(uint32_t);
-				specializationMapEntries[1].offset = sizeof(uint32_t);
-				specializationMapEntries[2].constantID = 3;
-				specializationMapEntries[2].size = sizeof(uint32_t);
-				specializationMapEntries[2].offset = 2*sizeof(uint32_t);
-				specializationMapEntries[3].constantID = 4;
-				specializationMapEntries[3].size = sizeof(uint32_t);
-				specializationMapEntries[3].offset = 3 * sizeof(uint32_t);
-				specializationMapEntries[4].constantID = 5;
-				specializationMapEntries[4].size = sizeof(uint32_t);
-				specializationMapEntries[4].offset = 4 * sizeof(uint32_t);
-				VkSpecializationInfo specializationInfo{};
-				specializationInfo.dataSize = 5*sizeof(uint32_t);
-				specializationInfo.mapEntryCount = static_cast<uint32_t>(specializationMapEntries.size());
-				specializationInfo.pMapEntries = specializationMapEntries.data();
-				specializationInfo.pData = &specialization;
+				gradientSpecializationConstants.localSize[0] = std::min((uint32_t)1024, SIZES[0] * SIZES[1] * SIZES[2]);
+				gradientSpecializationConstants.localSize[1] = 1;
+				gradientSpecializationConstants.localSize[2] = 1;
+				gradientSpecializationConstants.WIDTH = SIZES[0];
+				gradientSpecializationConstants.HEIGHT = SIZES[1];
+				gradientSpecializationConstants.DEPTH = SIZES[2];
+				gradientSpecializationConstants.pad = SIZES[0] * SIZES[1] * SIZES[2];
+				gradientSpecializationConstants.sumSubGroupSize = 32;
+				gradientSpecializationConstants.num_components_write = num_components;
+				gradientSpecializationConstants.save_energy = save_energy;
+				VkSpecializationMapEntry specializationMapEntries[sizeof(VulkanGradientSpecializationConstants)/sizeof(uint32_t)] = { {} };
+				for (uint32_t i = 0; i < sizeof(VulkanGradientSpecializationConstants) / sizeof(uint32_t); i++) {
+					specializationMapEntries[i].constantID = i + 1;
+					specializationMapEntries[i].size = sizeof(uint32_t);
+					specializationMapEntries[i].offset = i * sizeof(uint32_t);
+				}
+				VkSpecializationInfo specializationInfo = {};
+				specializationInfo.dataSize = sizeof(VulkanGradientSpecializationConstants);
+				specializationInfo.mapEntryCount = sizeof(VulkanGradientSpecializationConstants) / sizeof(uint32_t);
+				specializationInfo.pMapEntries = specializationMapEntries;
+		
+				specializationInfo.pData = &gradientSpecializationConstants;
 
 				pipelineShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 				pipelineShaderStageCreateInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -1253,17 +1235,15 @@ namespace VulkanCompute
 		void recordComputeGradients_noDDIAppend(VulkanCollection* collection, VkCommandBuffer* commandBuffer) {
 			vkCmdBindDescriptorSets(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
-			vkCmdDispatch(commandBuffer[0], (uint32_t)ceil((SIZES[0]) / float(WORKGROUP_SIZE)), (uint32_t)ceil(SIZES[1] / float(WORKGROUP_SIZE)), (uint32_t)SIZES[2]);
+			vkCmdDispatch(commandBuffer[0], gradientSpecializationConstants.pad/ gradientSpecializationConstants.localSize[0], 1, 1);
 
 		}
 
 		void createReadSpins(VulkanCollection* collection) {
 			{
-				VkDescriptorPoolSize descriptorPoolSize[2] = { };
-				descriptorPoolSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				descriptorPoolSize[0].descriptorCount = 1;
-				descriptorPoolSize[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				descriptorPoolSize[1].descriptorCount = 4;
+				VkDescriptorPoolSize descriptorPoolSize[1] = { };
+				descriptorPoolSize[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				descriptorPoolSize[0].descriptorCount = 4;
 				//collection->descriptorNum = 5;
 
 				VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
@@ -1275,7 +1255,7 @@ namespace VulkanCompute
 			}
 
 			{
-				const VkDescriptorType descriptorType[] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
+				const VkDescriptorType descriptorType[] = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
 				collection[0].descriptorSetLayouts = (VkDescriptorSetLayout*)malloc(sizeof(VkDescriptorSetLayout));
 				collection[0].descriptorSets = (VkDescriptorSet*)malloc(sizeof(VkDescriptorSet));
 				collection->descriptorNum = 1;
@@ -1300,26 +1280,21 @@ namespace VulkanCompute
 				for (uint32_t i = 0; i < COUNT_OF(descriptorType); ++i) {
 					VkDescriptorBufferInfo descriptorBufferInfo = { };
 					if (i == 0) {
-						descriptorBufferInfo.buffer = uboDimensions;
-						descriptorBufferInfo.offset = 0;
-						descriptorBufferInfo.range = sizeof(VulkanDimensions);
-					}
-					if (i == 1) {
 						descriptorBufferInfo.buffer = bufferSpinsInit;
 						descriptorBufferInfo.offset = 0;
 						descriptorBufferInfo.range = bufferSizeSpins;
 					}
-					if (i == 2) {
+					if (i == 1) {
 						descriptorBufferInfo.buffer = bufferSpins;
 						descriptorBufferInfo.offset = 0;
 						descriptorBufferInfo.range = bufferSizeSpins;
 					}
-					if (i == 3) {
+					if (i == 2) {
 						descriptorBufferInfo.buffer = bufferRegions_Book;
 						descriptorBufferInfo.offset = 0;
 						descriptorBufferInfo.range = bufferSizeRegions_Book;
 					}
-					if (i == 4) {
+					if (i == 3) {
 						descriptorBufferInfo.buffer = bufferRegions;
 						descriptorBufferInfo.offset = 0;
 						descriptorBufferInfo.range = bufferSizeRegions;
@@ -1346,7 +1321,18 @@ namespace VulkanCompute
 				vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, NULL, &collection[0].pipelineLayout);
 				VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo = { };
 				VkComputePipelineCreateInfo computePipelineCreateInfo = { };
+				VkSpecializationMapEntry specializationMapEntries[7] = { {} };
+				for (uint32_t i = 0; i < 7; i++) {
+					specializationMapEntries[i].constantID = i + 1;
+					specializationMapEntries[i].size = sizeof(uint32_t);
+					specializationMapEntries[i].offset = i * sizeof(uint32_t);
+				}
+				VkSpecializationInfo specializationInfo = {};
+				specializationInfo.dataSize = 7* sizeof(uint32_t);
+				specializationInfo.mapEntryCount =7;
+				specializationInfo.pMapEntries = specializationMapEntries;
 
+				specializationInfo.pData = &gradientSpecializationConstants;
 				pipelineShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 				pipelineShaderStageCreateInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
 				uint32_t filelength;
@@ -1358,6 +1344,7 @@ namespace VulkanCompute
 				vkCreateShaderModule(device, &createInfo, NULL, &pipelineShaderStageCreateInfo.module);
 				delete[] code;
 
+				pipelineShaderStageCreateInfo.pSpecializationInfo = &specializationInfo;
 				pipelineShaderStageCreateInfo.pName = "main";
 				computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
 				computePipelineCreateInfo.stage = pipelineShaderStageCreateInfo;
@@ -1380,17 +1367,15 @@ namespace VulkanCompute
 				VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 				vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
-				vkCmdDispatch(collection[0].commandBuffer, (uint32_t)ceil((SIZES[0]) / float(WORKGROUP_SIZE)), (uint32_t)ceil(SIZES[1] / float(WORKGROUP_SIZE)), (uint32_t)SIZES[2]);
+				vkCmdDispatch(collection[0].commandBuffer, gradientSpecializationConstants.pad / gradientSpecializationConstants.localSize[0], 1, 1);
 				VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
 			}
 		}
 		void createWriteGradient(VulkanCollection* collection) {
 			{
-				VkDescriptorPoolSize descriptorPoolSize[2] = { };
-				descriptorPoolSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				descriptorPoolSize[0].descriptorCount = 1;
-				descriptorPoolSize[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				descriptorPoolSize[1].descriptorCount = 2;
+				VkDescriptorPoolSize descriptorPoolSize[1] = { };
+				descriptorPoolSize[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				descriptorPoolSize[0].descriptorCount = 2;
 				//collection->descriptorNum = 3;
 
 				VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
@@ -1402,7 +1387,7 @@ namespace VulkanCompute
 			}
 
 			{
-				const VkDescriptorType descriptorType[] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
+				const VkDescriptorType descriptorType[] = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
 				collection[0].descriptorSetLayouts = (VkDescriptorSetLayout*)malloc(sizeof(VkDescriptorSetLayout));
 				collection[0].descriptorSets = (VkDescriptorSet*)malloc(sizeof(VkDescriptorSet));
 				collection->descriptorNum = 1;
@@ -1426,17 +1411,13 @@ namespace VulkanCompute
 				vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo, collection[0].descriptorSets);
 				for (uint32_t i = 0; i < COUNT_OF(descriptorType); ++i) {
 					VkDescriptorBufferInfo descriptorBufferInfo = { };
+
 					if (i == 0) {
-						descriptorBufferInfo.buffer = uboDimensions;
-						descriptorBufferInfo.offset = 0;
-						descriptorBufferInfo.range = sizeof(VulkanDimensions);
-					}
-					if (i == 1) {
 						descriptorBufferInfo.buffer = bufferGradient;
 						descriptorBufferInfo.offset = 0;
 						descriptorBufferInfo.range = num_components*bufferSizeGradient;
 					}
-					if (i == 2) {
+					if (i == 1) {
 						descriptorBufferInfo.buffer = bufferGradientOut;
 						descriptorBufferInfo.offset = 0;
 						descriptorBufferInfo.range = num_components*bufferSizeGradient;
@@ -1464,17 +1445,18 @@ namespace VulkanCompute
 				VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo = { };
 				VkComputePipelineCreateInfo computePipelineCreateInfo = { };
 
-				std::array<VkSpecializationMapEntry, 1> specializationMapEntries;
-				specializationMapEntries[0].constantID = 1;
-				specializationMapEntries[0].size = sizeof(uint32_t);
-				specializationMapEntries[0].offset = 0;
-				
-				
-				VkSpecializationInfo specializationInfo{};
-				specializationInfo.dataSize = sizeof(uint32_t);
-				specializationInfo.mapEntryCount = static_cast<uint32_t>(specializationMapEntries.size());
-				specializationInfo.pMapEntries = specializationMapEntries.data();
-				specializationInfo.pData = &num_components;
+				VkSpecializationMapEntry specializationMapEntries[8] = { {} };
+				for (uint32_t i = 0; i < 8; i++) {
+					specializationMapEntries[i].constantID = i + 1;
+					specializationMapEntries[i].size = sizeof(uint32_t);
+					specializationMapEntries[i].offset = i * sizeof(uint32_t);
+				}
+				VkSpecializationInfo specializationInfo = {};
+				specializationInfo.dataSize = 8 * sizeof(uint32_t);
+				specializationInfo.mapEntryCount = 8;
+				specializationInfo.pMapEntries = specializationMapEntries;
+
+				specializationInfo.pData = &gradientSpecializationConstants;
 
 				pipelineShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 				pipelineShaderStageCreateInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -1510,17 +1492,15 @@ namespace VulkanCompute
 				VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 				vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
-				vkCmdDispatch(collection[0].commandBuffer, (uint32_t)ceil((SIZES[0]) / float(WORKGROUP_SIZE)), (uint32_t)ceil(SIZES[1] / float(WORKGROUP_SIZE)), (uint32_t)SIZES[2]);
+				vkCmdDispatch(collection[0].commandBuffer, gradientSpecializationConstants.pad / gradientSpecializationConstants.localSize[0], 1, 1);
 				VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
 			}
 		}
 		void createWriteSpins(VulkanCollection* collection) {
 			{
-				VkDescriptorPoolSize descriptorPoolSize[2] = { };
-				descriptorPoolSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				descriptorPoolSize[0].descriptorCount = 1;
-				descriptorPoolSize[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				descriptorPoolSize[1].descriptorCount = 2;
+				VkDescriptorPoolSize descriptorPoolSize[1] = { };
+				descriptorPoolSize[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				descriptorPoolSize[0].descriptorCount = 2;
 				//collection->descriptorNum = 3;
 
 				VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
@@ -1532,7 +1512,7 @@ namespace VulkanCompute
 			}
 
 			{
-				const VkDescriptorType descriptorType[] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
+				const VkDescriptorType descriptorType[] = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
 				collection[0].descriptorSetLayouts = (VkDescriptorSetLayout*)malloc(sizeof(VkDescriptorSetLayout));
 				collection[0].descriptorSets = (VkDescriptorSet*)malloc(sizeof(VkDescriptorSet));
 				collection->descriptorNum = 1;
@@ -1556,17 +1536,13 @@ namespace VulkanCompute
 				vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo, collection[0].descriptorSets);
 				for (uint32_t i = 0; i < COUNT_OF(descriptorType); ++i) {
 					VkDescriptorBufferInfo descriptorBufferInfo = { };
+
 					if (i == 0) {
-						descriptorBufferInfo.buffer = uboDimensions;
-						descriptorBufferInfo.offset = 0;
-						descriptorBufferInfo.range = sizeof(VulkanDimensions);
-					}
-					if (i == 1) {
 						descriptorBufferInfo.buffer = bufferSpins;
 						descriptorBufferInfo.offset = 0;
 						descriptorBufferInfo.range = bufferSizeSpins;
 					}
-					if (i == 2) {
+					if (i == 1) {
 						descriptorBufferInfo.buffer = bufferSpinsInit;
 						descriptorBufferInfo.offset = 0;
 						descriptorBufferInfo.range = bufferSizeSpins;
@@ -1593,7 +1569,18 @@ namespace VulkanCompute
 				vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, NULL, &collection[0].pipelineLayout);
 				VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo = { };
 				VkComputePipelineCreateInfo computePipelineCreateInfo = { };
+				VkSpecializationMapEntry specializationMapEntries[7] = { {} };
+				for (uint32_t i = 0; i < 7; i++) {
+					specializationMapEntries[i].constantID = i + 1;
+					specializationMapEntries[i].size = sizeof(uint32_t);
+					specializationMapEntries[i].offset = i * sizeof(uint32_t);
+				}
+				VkSpecializationInfo specializationInfo = {};
+				specializationInfo.dataSize = 7 * sizeof(uint32_t);
+				specializationInfo.mapEntryCount = 7;
+				specializationInfo.pMapEntries = specializationMapEntries;
 
+				specializationInfo.pData = &gradientSpecializationConstants;
 				pipelineShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 				pipelineShaderStageCreateInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
 				uint32_t filelength;
@@ -1604,6 +1591,7 @@ namespace VulkanCompute
 				createInfo.codeSize = filelength;
 				vkCreateShaderModule(device, &createInfo, NULL, &pipelineShaderStageCreateInfo.module);
 				delete[] code;
+				pipelineShaderStageCreateInfo.pSpecializationInfo = &specializationInfo;
 				pipelineShaderStageCreateInfo.pName = "main";
 				computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
 				computePipelineCreateInfo.stage = pipelineShaderStageCreateInfo;
@@ -1626,7 +1614,7 @@ namespace VulkanCompute
 				VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 				vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
-				vkCmdDispatch(collection[0].commandBuffer, (uint32_t)ceil((SIZES[0]) / float(WORKGROUP_SIZE)), (uint32_t)ceil(SIZES[1] / float(WORKGROUP_SIZE)), (uint32_t)SIZES[2]);
+				vkCmdDispatch(collection[0].commandBuffer, gradientSpecializationConstants.pad / gradientSpecializationConstants.localSize[0], 1, 1);
 				VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
 			}
 		}
@@ -7921,7 +7909,6 @@ namespace VulkanCompute
 			vkDestroyBuffer(device, bufferRegions, NULL);
 			vkDestroyBuffer(device, bufferSpinsInit, NULL);
 			vkDestroyBuffer(device, bufferGradientOut, NULL);
-			vkDestroyBuffer(device, uboDimensions, NULL);
 			vkDestroyBuffer(device, bufferEnergy, NULL);
 
 
@@ -7934,7 +7921,6 @@ namespace VulkanCompute
 			vkFreeMemory(device, bufferMemoryRegions, NULL);
 			vkFreeMemory(device, bufferMemorySpinsInit, NULL);
 			vkFreeMemory(device, bufferMemoryGradientOut, NULL);
-			vkFreeMemory(device, uboMemoryDimensions, NULL);
 			vkFreeMemory(device, bufferMemoryEnergy, NULL);
 			freeLastSolver();
 			deleteCollection(&collectionReadSpins);
