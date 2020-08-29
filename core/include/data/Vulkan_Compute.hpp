@@ -63,7 +63,7 @@ namespace VulkanCompute
 		VkDescriptorSetLayout* descriptorSetLayouts;
 		VkDescriptorSet* descriptorSets;
 		VkPipelineLayout pipelineLayout;
-		VkPipeline* pipelines;
+		VkPipeline pipelines;
 		VkShaderModule computeShader;
 		VkCommandBuffer commandBuffer;
 	} VulkanCollection;
@@ -752,7 +752,7 @@ namespace VulkanCompute
 				data_regions_book[i] = regions_book[i];
 			}
 			transferDataFromCPU(data_regions_book, bufferSizeRegions_Book, &bufferRegions_Book);
-			delete[] data_regions_book;
+			free( data_regions_book);
 		}
 		void updateRegions(int* regions) {
 			int* data_regions = (int*)malloc(sizeof(int) * SIZES[0] * SIZES[1] * SIZES[2]);
@@ -760,7 +760,7 @@ namespace VulkanCompute
 				data_regions[i] = regions[i];
 			}
 			transferDataFromCPU(data_regions, bufferSizeRegions, &bufferRegions);
-			delete[] data_regions;
+			free( data_regions);
 
 		}
 		void freeLastSolver() {
@@ -982,7 +982,7 @@ namespace VulkanCompute
 			}
 			
 			transferDataFromCPU(data, bufferSizeKernel, &kernel);
-			delete[] data;
+			free( data);
 
 			VkCommandBufferAllocateInfo commandBufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
 			commandBufferAllocateInfo.commandPool = commandPool;
@@ -1015,7 +1015,7 @@ namespace VulkanCompute
 				iter[i] = 0;
 			}
 			transferDataFromCPU(iter, vulkanLBFGS.bufferSizes[6], &vulkanLBFGS.buffer[6]);
-		
+			free(iter);
 		}
 
 		void copySpinsToCPU(scalar* spins, bool* allow_copy) {
@@ -1025,6 +1025,7 @@ namespace VulkanCompute
 			vkUnmapMemory(device, bufferMemoryStagingSpins);
 
 			allow_copy[0] = true;
+
 		}
 		void copyGradientToCPU(scalar* gradient_contributions_per_spin, bool* allow_copy) {
 			void* data;
@@ -1174,7 +1175,7 @@ namespace VulkanCompute
 			}
 
 			{
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -1227,14 +1228,14 @@ namespace VulkanCompute
 				computePipelineCreateInfo.layout = collection[0].pipelineLayout;
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 			
 		}
 		void recordComputeGradients_noDDIAppend(VulkanCollection* collection, VkCommandBuffer* commandBuffer) {
 			vkCmdBindDescriptorSets(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
-			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 			vkCmdDispatch(commandBuffer[0], gradientSpecializationConstants.pad/ gradientSpecializationConstants.localSize[0], 1, 1);
 
 		}
@@ -1313,7 +1314,7 @@ namespace VulkanCompute
 			}
 
 			{
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -1351,7 +1352,7 @@ namespace VulkanCompute
 				computePipelineCreateInfo.layout = collection[0].pipelineLayout;
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 			{
@@ -1366,7 +1367,7 @@ namespace VulkanCompute
 				beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 				VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 				vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
-				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 				vkCmdDispatch(collection[0].commandBuffer, gradientSpecializationConstants.pad / gradientSpecializationConstants.localSize[0], 1, 1);
 				VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
 			}
@@ -1436,7 +1437,7 @@ namespace VulkanCompute
 			}
 
 			{
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -1476,7 +1477,7 @@ namespace VulkanCompute
 				computePipelineCreateInfo.layout = collection[0].pipelineLayout;
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 			{
@@ -1491,7 +1492,7 @@ namespace VulkanCompute
 				beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 				VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 				vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
-				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 				vkCmdDispatch(collection[0].commandBuffer, gradientSpecializationConstants.pad / gradientSpecializationConstants.localSize[0], 1, 1);
 				VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
 			}
@@ -1561,7 +1562,7 @@ namespace VulkanCompute
 			}
 
 			{
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -1598,7 +1599,7 @@ namespace VulkanCompute
 				computePipelineCreateInfo.layout = collection[0].pipelineLayout;
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 			{
@@ -1613,7 +1614,7 @@ namespace VulkanCompute
 				beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 				VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 				vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
-				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 				vkCmdDispatch(collection[0].commandBuffer, gradientSpecializationConstants.pad / gradientSpecializationConstants.localSize[0], 1, 1);
 				VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
 			}
@@ -1678,7 +1679,10 @@ namespace VulkanCompute
 
 			vkFreeMemory(device, vulkanReduce->deviceMemoryLastMax, NULL);
 			vkDestroyBuffer(device, vulkanReduce->lastMax, NULL);
-			
+			free(vulkanReduce->sizes);
+			free(vulkanReduce->sizesMax);
+			free(vulkanReduce->buffer);
+			free(vulkanReduce->deviceMemory);
 			//vulkanReduce->sizes[vulkanReduce->bufferNum - 1] = 1;
 			//createBufferFFT(vulkanReduce->context, &vulkanReduce->buffer[vulkanReduce->bufferNum - 1], &deviceMemory[vulkanReduce->bufferNum - 1], VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT, 3 * sizeof(float));
 
@@ -1758,7 +1762,7 @@ namespace VulkanCompute
 			}
 
 			{
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = vulkanReduce.bufferNum;
@@ -1810,7 +1814,7 @@ namespace VulkanCompute
 					computePipelineCreateInfo[i].layout = collection[0].pipelineLayout;
 				}
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo[0].module, NULL);
 			}
 			int n = SIZES[0] * SIZES[1] * SIZES[2];
@@ -1825,12 +1829,12 @@ namespace VulkanCompute
 			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 			VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 			vkCmdPushConstants(collection[0].commandBuffer, collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &n);
-			vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 			vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 			vkCmdDispatch(collection[0].commandBuffer, vulkanReduce.sizes[0], 1, 1);
 			for (uint32_t i = 0; i < vulkanReduce.bufferNum - 1; ++i) {
 				vkCmdPushConstants(collection[0].commandBuffer, collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &vulkanReduce.sizes[i]);
-				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 				vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[i + 1], 0, NULL);
 				vkCmdDispatch(collection[0].commandBuffer, vulkanReduce.sizes[i + 1], 1, 1);
 			}
@@ -1914,7 +1918,7 @@ namespace VulkanCompute
 
 			{
 
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -1969,7 +1973,7 @@ namespace VulkanCompute
 					computePipelineCreateInfo[i].layout = collection[0].pipelineLayout;
 				}
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo[0].module, NULL);
 
 			}
@@ -2053,7 +2057,7 @@ namespace VulkanCompute
 
 			{
 				
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -2108,7 +2112,7 @@ namespace VulkanCompute
 					computePipelineCreateInfo[i].layout = collection[0].pipelineLayout;
 				}
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo[0].module, NULL);
 			}
 			//uint32_t n[3] = SIZES[0] * SIZES[1] * SIZES[2];
@@ -2183,7 +2187,7 @@ namespace VulkanCompute
 
 			{
 
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = (vulkanReduce->bufferNumMax - 1);
@@ -2242,7 +2246,7 @@ namespace VulkanCompute
 					computePipelineCreateInfo[i].layout = collection[0].pipelineLayout;
 				}
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo[0].module, NULL);
 			}
 			int n = SIZES[0] * SIZES[1] * SIZES[2];
@@ -2316,7 +2320,7 @@ namespace VulkanCompute
 			}
 
 			{
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = (vulkanReduce->bufferNumMax - 1);
@@ -2375,7 +2379,7 @@ namespace VulkanCompute
 					computePipelineCreateInfo[i].layout = collection[0].pipelineLayout;
 				}
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo[0].module, NULL);
 			}
 			int n = SIZES[0] * SIZES[1] * SIZES[2];
@@ -2452,7 +2456,7 @@ namespace VulkanCompute
 
 			{
 
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = (vulkanReduce->bufferNum - 1);
@@ -2511,7 +2515,7 @@ namespace VulkanCompute
 					computePipelineCreateInfo[i].layout = collection[0].pipelineLayout;
 				}
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo[0].module, NULL);
 			}
 			int n = SIZES[0] * SIZES[1] * SIZES[2];
@@ -2528,7 +2532,7 @@ namespace VulkanCompute
 			for (uint32_t i = 0; i < vulkanReduce->bufferNum - 1; ++i) {
 
 				vkCmdPushConstants(collection[0].commandBuffer, collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &vulkanReduce->sizes[i]);
-				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 				vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[i], 0, NULL);
 				vkCmdDispatch(collection[0].commandBuffer, vulkanReduce->sizes[i + 1], 1, 1);
 			}
@@ -2603,7 +2607,7 @@ namespace VulkanCompute
 
 			{
 
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = (vulkanReduce->bufferNum - 1);
@@ -2662,7 +2666,7 @@ namespace VulkanCompute
 					computePipelineCreateInfo[i].layout = collection[0].pipelineLayout;
 				}
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo[0].module, NULL);
 			}
 			int n = SIZES[0] * SIZES[1] * SIZES[2];
@@ -2679,7 +2683,7 @@ namespace VulkanCompute
 			for (uint32_t i = 0; i < vulkanReduce->bufferNum - 1; ++i) {
 
 				vkCmdPushConstants(collection[0].commandBuffer, collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &vulkanReduce->sizes[i]);
-				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 				vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[i], 0, NULL);
 				vkCmdDispatch(collection[0].commandBuffer, vulkanReduce->sizes[i + 1], 1, 1);
 			}
@@ -2746,7 +2750,7 @@ namespace VulkanCompute
 			}
 
 			{
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = (vulkanReduce->bufferNum - 1);
@@ -2805,7 +2809,7 @@ namespace VulkanCompute
 					computePipelineCreateInfo[i].layout = collection[0].pipelineLayout;
 				}
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo[0].module, NULL);
 			}
 			int n = SIZES[0] * SIZES[1] * SIZES[2];
@@ -2822,7 +2826,7 @@ namespace VulkanCompute
 			for (uint32_t i = 0; i < vulkanReduce->bufferNum - 1; ++i) {
 
 				vkCmdPushConstants(collection[0].commandBuffer, collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &vulkanReduce->sizes[i]);
-				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 				vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[i], 0, NULL);
 				vkCmdDispatch(collection[0].commandBuffer, vulkanReduce->sizes[i + 1], 1, 1);
 			}
@@ -2832,7 +2836,7 @@ namespace VulkanCompute
 			for (uint32_t i = 0; i < vulkanReduce->bufferNum - 1; ++i) {
 
 				vkCmdPushConstants(commandBuffer[0], collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &vulkanReduce->sizes[i]);
-				vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+				vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 				vkCmdBindDescriptorSets(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[i], 0, NULL);
 				vkCmdDispatch(commandBuffer[0], vulkanReduce->sizes[i + 1], 1, 1);
 				vkCmdPipelineBarrier(commandBuffer[0], VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, memory_barrier, 0, NULL, 0, NULL);
@@ -2844,7 +2848,7 @@ namespace VulkanCompute
 			for (uint32_t i = 0; i < vulkanReduce->bufferNumMax - 1; ++i) {
 
 				vkCmdPushConstants(commandBuffer[0], collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &vulkanReduce->sizesMax[i]);
-				vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+				vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 				vkCmdBindDescriptorSets(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[i], 0, NULL);
 				vkCmdDispatch(commandBuffer[0], vulkanReduce->sizesMax[i + 1], 1, 1);
 				vkCmdPipelineBarrier(commandBuffer[0], VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, memory_barrier, 0, NULL, 0, NULL);
@@ -2918,7 +2922,7 @@ namespace VulkanCompute
 
 			{
 				
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -2943,7 +2947,7 @@ namespace VulkanCompute
 				computePipelineCreateInfo.layout = collection[0].pipelineLayout;
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 			{
@@ -2958,7 +2962,7 @@ namespace VulkanCompute
 				beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 				VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 				vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, collection[0].descriptorSets, 0, NULL);
-				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 				vkCmdDispatch(collection[0].commandBuffer, (uint32_t)ceil(3 * SIZES[0] * SIZES[1] * SIZES[2] / 1024.0f), 1, 1);
 				VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
 			}
@@ -3036,7 +3040,7 @@ namespace VulkanCompute
 
 			{
 				
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -3069,7 +3073,7 @@ namespace VulkanCompute
 					computePipelineCreateInfo[i].layout = collection[0].pipelineLayout;
 				}
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo[0].module, NULL);
 			}
 			//uint32_t n[3] = SIZES[0] * SIZES[1] * SIZES[2];
@@ -3087,7 +3091,7 @@ namespace VulkanCompute
 			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 			VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 			vkCmdPushConstants(collection[0].commandBuffer, collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(float), &vulkanLBFGS.setDir1Consts);
-			vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 			vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 			vkCmdDispatch(collection[0].commandBuffer, (uint32_t)ceil(3 * SIZES[0] * SIZES[1] * SIZES[2] / 1024.0f), 1, 1);
 			VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
@@ -3157,7 +3161,7 @@ namespace VulkanCompute
 
 			{
 				
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -3182,7 +3186,7 @@ namespace VulkanCompute
 				computePipelineCreateInfo.layout = collection[0].pipelineLayout;
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 			{
@@ -3197,7 +3201,7 @@ namespace VulkanCompute
 				beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 				VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 				vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, collection[0].descriptorSets, 0, NULL);
-				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 				vkCmdDispatch(collection[0].commandBuffer, (uint32_t)ceil(3 * SIZES[0] * SIZES[1] * SIZES[2] * vulkanLBFGS.n_lbfgs_memory / 1024.0f), 1, 1);
 				VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
 			}
@@ -3282,7 +3286,7 @@ namespace VulkanCompute
 
 			{
 				
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -3314,7 +3318,7 @@ namespace VulkanCompute
 				computePipelineCreateInfo.layout = collection[0].pipelineLayout;
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 			{
@@ -3330,7 +3334,7 @@ namespace VulkanCompute
 				VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 				vkCmdPushConstants(collection[0].commandBuffer, collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &vulkanLBFGS.apply0Consts);
 				vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, collection[0].descriptorSets, 0, NULL);
-				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 				vkCmdDispatch(collection[0].commandBuffer, (uint32_t)ceil(3 * SIZES[0] * SIZES[1] * SIZES[2] / 1024.0f), 1, 1);
 				VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
 			}
@@ -3408,7 +3412,7 @@ namespace VulkanCompute
 
 			{
 				
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -3441,7 +3445,7 @@ namespace VulkanCompute
 					computePipelineCreateInfo[i].layout = collection[0].pipelineLayout;
 				}
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo[0].module, NULL);
 			}
 			//uint32_t n[3] = SIZES[0] * SIZES[1] * SIZES[2];
@@ -3459,7 +3463,7 @@ namespace VulkanCompute
 			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 			VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 			vkCmdPushConstants(collection[0].commandBuffer, collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 2 * sizeof(uint32_t), &vulkanLBFGS.apply1Consts);
-			vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 			vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 			vkCmdDispatch(collection[0].commandBuffer, (uint32_t)ceil(3 * SIZES[0] * SIZES[1] * SIZES[2] / 1024.0f), 1, 1);
 			VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
@@ -3537,7 +3541,7 @@ namespace VulkanCompute
 
 			{
 				
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -3570,7 +3574,7 @@ namespace VulkanCompute
 					computePipelineCreateInfo[i].layout = collection[0].pipelineLayout;
 				}
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo[0].module, NULL);
 			}
 			//uint32_t n[3] = SIZES[0] * SIZES[1] * SIZES[2];
@@ -3588,7 +3592,7 @@ namespace VulkanCompute
 			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 			VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 			vkCmdPushConstants(collection[0].commandBuffer, collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 3 * sizeof(uint32_t), &vulkanLBFGS.apply2Consts);
-			vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 			vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 			vkCmdDispatch(collection[0].commandBuffer, (uint32_t)ceil(3 * SIZES[0] * SIZES[1] * SIZES[2] / 1024.0f), 1, 1);
 			VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
@@ -3663,7 +3667,7 @@ namespace VulkanCompute
 
 			{
 				
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -3688,7 +3692,7 @@ namespace VulkanCompute
 				computePipelineCreateInfo.layout = collection[0].pipelineLayout;
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 			{
@@ -3703,7 +3707,7 @@ namespace VulkanCompute
 				beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 				VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 				vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, collection[0].descriptorSets, 0, NULL);
-				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 				vkCmdDispatch(collection[0].commandBuffer, (uint32_t)ceil(3 * SIZES[0] * SIZES[1] * SIZES[2] / 1024.0f), 1, 1);
 				VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
 			}
@@ -3770,7 +3774,7 @@ namespace VulkanCompute
 
 			{
 				
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -3803,7 +3807,7 @@ namespace VulkanCompute
 					computePipelineCreateInfo[i].layout = collection[0].pipelineLayout;
 				}
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo[0].module, NULL);
 			}
 			//uint32_t n[3] = SIZES[0] * SIZES[1] * SIZES[2];
@@ -3821,7 +3825,7 @@ namespace VulkanCompute
 			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 			VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 			vkCmdPushConstants(collection[0].commandBuffer, collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(scalar), &vulkanLBFGS.scaling);
-			vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 			vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 			vkCmdDispatch(collection[0].commandBuffer, (uint32_t)ceil(3 * SIZES[0] * SIZES[1] * SIZES[2] / 1024.0f), 1, 1);
 			VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
@@ -3901,7 +3905,7 @@ namespace VulkanCompute
 
 			{
 
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -3943,14 +3947,14 @@ namespace VulkanCompute
 				computePipelineCreateInfo.layout = collection[0].pipelineLayout;
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 
 		}
 		void recordOsoCalcGradientsAppend(VulkanCollection* collection, VkCommandBuffer* commandBuffer) {
 			vkCmdBindDescriptorSets(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, collection[0].descriptorSets, 0, NULL);
-			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 			vkCmdDispatch(commandBuffer[0], (uint32_t)ceil(SIZES[0] * SIZES[1] * SIZES[2] / 1024.0f), 1, 1);
 
 		}
@@ -4014,6 +4018,9 @@ namespace VulkanCompute
 				vkFreeMemory(device, vulkanLBFGS.deviceMemory[7], NULL);
 				vkDestroyBuffer(device, vulkanLBFGS.buffer[7], NULL);
 			}
+			free(vulkanLBFGS.bufferSizes);
+			free(vulkanLBFGS.buffer);
+			free(vulkanLBFGS.deviceMemory);
 		}
 		void createApplyLBFGS1(VulkanCollection* collection) {
 			{
@@ -4117,7 +4124,7 @@ namespace VulkanCompute
 
 			{
 
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -4171,7 +4178,7 @@ namespace VulkanCompute
 
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 			
@@ -4278,7 +4285,7 @@ namespace VulkanCompute
 
 			{
 
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -4332,7 +4339,7 @@ namespace VulkanCompute
 
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 
@@ -4413,7 +4420,7 @@ namespace VulkanCompute
 
 			{
 
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -4464,7 +4471,7 @@ namespace VulkanCompute
 				computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
 				computePipelineCreateInfo.stage = pipelineShaderStageCreateInfo;
 				computePipelineCreateInfo.layout = collection[0].pipelineLayout;
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 
@@ -4556,7 +4563,7 @@ namespace VulkanCompute
 
 			{
 
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -4610,7 +4617,7 @@ namespace VulkanCompute
 
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 
@@ -4691,7 +4698,7 @@ namespace VulkanCompute
 
 			{
 
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -4742,7 +4749,7 @@ namespace VulkanCompute
 				computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
 				computePipelineCreateInfo.stage = pipelineShaderStageCreateInfo;
 				computePipelineCreateInfo.layout = collection[0].pipelineLayout;
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 
@@ -4839,7 +4846,7 @@ namespace VulkanCompute
 
 			{
 
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -4893,7 +4900,7 @@ namespace VulkanCompute
 
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 
@@ -4964,7 +4971,7 @@ namespace VulkanCompute
 
 			{
 
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -5015,7 +5022,7 @@ namespace VulkanCompute
 				computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
 				computePipelineCreateInfo.stage = pipelineShaderStageCreateInfo;
 				computePipelineCreateInfo.layout = collection[0].pipelineLayout;
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 
@@ -5112,7 +5119,7 @@ namespace VulkanCompute
 
 			{
 				
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -5170,7 +5177,7 @@ namespace VulkanCompute
 
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 
@@ -5260,7 +5267,7 @@ namespace VulkanCompute
 
 			{
 
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -5318,7 +5325,7 @@ namespace VulkanCompute
 
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 
@@ -5326,14 +5333,14 @@ namespace VulkanCompute
 		void appendLBFGSstep(VulkanCollection* collection, VkCommandBuffer* commandBuffer) {
 			int nos = SIZES[0] * SIZES[1] * SIZES[2];
 			vkCmdPushConstants(commandBuffer[0], collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 6 * sizeof(uint32_t), &vulkanLBFGS.applyLBFGSConsts);
-			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 			vkCmdBindDescriptorSets(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 			vkCmdDispatch(commandBuffer[0], (uint32_t)ceil(3 * SIZES[0] * SIZES[1] * SIZES[2] / 1024.0f), 1, 1);
 
 		}
 		void appendLBFGSstep2(VulkanCollection* collection, VkCommandBuffer* commandBuffer) {
 			vkCmdPushConstants(commandBuffer[0], collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 6 * sizeof(uint32_t), &vulkanLBFGS.applyLBFGSConsts);
-			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 			vkCmdBindDescriptorSets(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 			vkCmdDispatch(commandBuffer[0], (uint32_t)ceil( SIZES[0] * SIZES[1] * SIZES[2] / 1024.0f), 1, 1);
 
@@ -5511,7 +5518,7 @@ namespace VulkanCompute
 
 			{
 				
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -5550,7 +5557,7 @@ namespace VulkanCompute
 				computePipelineCreateInfo.layout = collection[0].pipelineLayout;
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 			{
@@ -5565,7 +5572,7 @@ namespace VulkanCompute
 				beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 				VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 				vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, collection[0].descriptorSets, 0, NULL);
-				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 				vkCmdDispatch(collection[0].commandBuffer, (uint32_t)ceil(SIZES[0] * SIZES[1] * SIZES[2] / 1024.0f), 1, 1);
 				VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
 			}
@@ -5779,6 +5786,9 @@ namespace VulkanCompute
 				vkFreeMemory(device, vulkanLBFGS.deviceMemory[i], NULL);
 				vkDestroyBuffer(device, vulkanLBFGS.buffer[i], NULL);
 			}
+			free(vulkanLBFGS.buffer);
+			free(vulkanLBFGS.bufferSizes);
+			free(vulkanLBFGS.deviceMemory);
 		}
 		void createVP(VulkanLBFGS* vulkanLBFGS) {
 			uint32_t nos = SIZES[0] * SIZES[1] * SIZES[2];
@@ -5804,7 +5814,7 @@ namespace VulkanCompute
 				data_grad_pr[i] = 0.0;
 			}
 			transferDataFromCPU(data_grad_pr, vulkanLBFGS->bufferSizes[0], &vulkanLBFGS->buffer[0]);
-						
+			free(data_grad_pr);
 			scalar gamma_transfer[2];
 			gamma_transfer[0] = 0;
 			gamma_transfer[1] = 1;
@@ -5933,7 +5943,7 @@ namespace VulkanCompute
 
 			{
 				
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -5984,7 +5994,7 @@ namespace VulkanCompute
 				computePipelineCreateInfo.layout = collection[0].pipelineLayout;
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 			{
@@ -6004,7 +6014,7 @@ namespace VulkanCompute
 			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 			VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 			vkCmdPushConstants(collection[0].commandBuffer, collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 3 * sizeof(scalar), &vulkanLBFGS.applyVP2Consts);
-			vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 			vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 			vkCmdDispatch(collection[0].commandBuffer, (uint32_t)ceil(SIZES[0] * SIZES[1] * SIZES[2] / 1024.0f), 1, 1);
 			VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
@@ -6012,7 +6022,7 @@ namespace VulkanCompute
 		void recordApplyVP2Append(VulkanCollection* collection, VkCommandBuffer* commandBuffer) {
 
 			vkCmdPushConstants(commandBuffer[0], collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 3 * sizeof(scalar), &vulkanLBFGS.applyVP2Consts);
-			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 			vkCmdBindDescriptorSets(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 			vkCmdDispatch(commandBuffer[0], (uint32_t)ceil(SIZES[0] * SIZES[1] * SIZES[2] / 1024.0f), 1, 1);
 
@@ -6129,7 +6139,7 @@ namespace VulkanCompute
 
 			{
 				
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -6183,7 +6193,7 @@ namespace VulkanCompute
 
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 			{
@@ -6197,7 +6207,7 @@ namespace VulkanCompute
 				beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 				VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 				vkCmdPushConstants(collection[0].commandBuffer, collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 3 * sizeof(uint32_t), &vulkanLBFGS.applyVP1Consts);
-				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 				vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 				vkCmdDispatch(collection[0].commandBuffer, vulkanReduce.sizes[0], 1, 1);
 				VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
@@ -6206,7 +6216,7 @@ namespace VulkanCompute
 		}
 		void recordApplyVP1Append(VulkanCollection* collection, VkCommandBuffer* commandBuffer) {
 			vkCmdPushConstants(commandBuffer[0], collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 3 * sizeof(uint32_t), &vulkanLBFGS.applyVP1Consts);
-			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 			vkCmdBindDescriptorSets(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 			vkCmdDispatch(commandBuffer[0], vulkanReduce.sizes[0], 1, 1);
 
@@ -6236,6 +6246,7 @@ namespace VulkanCompute
 			{
 				allocateBuffer(&vulkanLBFGS.buffer[i], &vulkanLBFGS.deviceMemory[i], VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_HEAP_DEVICE_LOCAL_BIT, vulkanLBFGS.bufferSizes[i]);
 			}
+
 			/*uint32_t* reduce = (uint32_t*)malloc(vulkanReduce.sizes[vulkanReduce.bufferNum-1]);
 			for (uint32_t i = 0; i < vulkanReduce.sizes[vulkanReduce.bufferNum - 1] / sizeof(scalar); ++i) {
 				reduce[i] = 0;
@@ -6250,6 +6261,9 @@ namespace VulkanCompute
 				vkFreeMemory(device, vulkanLBFGS.deviceMemory[i], NULL);
 				vkDestroyBuffer(device, vulkanLBFGS.buffer[i], NULL);
 			}
+			free(vulkanLBFGS.buffer);
+			free(vulkanLBFGS.bufferSizes);
+			free(vulkanLBFGS.deviceMemory);
 		}
 		void createCG(VulkanLBFGS* vulkanLBFGS) {
 			uint32_t nos = SIZES[0] * SIZES[1] * SIZES[2];
@@ -6393,7 +6407,7 @@ namespace VulkanCompute
 
 			{
 
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -6444,7 +6458,7 @@ namespace VulkanCompute
 				computePipelineCreateInfo.layout = collection[0].pipelineLayout;
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 			{
@@ -6464,7 +6478,7 @@ namespace VulkanCompute
 			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 			VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 			vkCmdPushConstants(collection[0].commandBuffer, collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,2* sizeof(scalar), &vulkanLBFGS.applyCGConsts);
-			vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 			vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 			vkCmdDispatch(collection[0].commandBuffer, (uint32_t)ceil(SIZES[0] * SIZES[1] * SIZES[2] / 1024.0f), 1, 1);
 			VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
@@ -6472,7 +6486,7 @@ namespace VulkanCompute
 		void recordApplyCG2Append(VulkanCollection* collection, VkCommandBuffer* commandBuffer) {
 
 			vkCmdPushConstants(commandBuffer[0], collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 2*sizeof(scalar), &vulkanLBFGS.applyCGConsts);
-			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 			vkCmdBindDescriptorSets(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 			vkCmdDispatch(commandBuffer[0], (uint32_t)ceil(SIZES[0] * SIZES[1] * SIZES[2] / 1024.0f), 1, 1);
 
@@ -6578,7 +6592,7 @@ namespace VulkanCompute
 
 			{
 
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -6632,7 +6646,7 @@ namespace VulkanCompute
 
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 			{
@@ -6646,7 +6660,7 @@ namespace VulkanCompute
 				beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 				VK_CHECK_RESULT(vkBeginCommandBuffer(collection[0].commandBuffer, &beginInfo)); // start recording commands.
 				vkCmdPushConstants(collection[0].commandBuffer, collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,  2*sizeof(uint32_t), &vulkanLBFGS.applyCGConsts);
-				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+				vkCmdBindPipeline(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 				vkCmdBindDescriptorSets(collection[0].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 				vkCmdDispatch(collection[0].commandBuffer, vulkanReduce.sizes[0], 1, 1);
 				VK_CHECK_RESULT(vkEndCommandBuffer(collection[0].commandBuffer)); // end recording commands.
@@ -6655,7 +6669,7 @@ namespace VulkanCompute
 		}
 		void recordApplyCG1Append(VulkanCollection* collection, VkCommandBuffer* commandBuffer) {
 			vkCmdPushConstants(commandBuffer[0], collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 2* sizeof(uint32_t), &vulkanLBFGS.applyCGConsts);
-			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 			vkCmdBindDescriptorSets(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 			vkCmdDispatch(commandBuffer[0], vulkanReduce.sizes[0], 1, 1);
 
@@ -6729,6 +6743,9 @@ namespace VulkanCompute
 				vkFreeMemory(device, vulkanLBFGS.deviceMemory[i], NULL);
 				vkDestroyBuffer(device, vulkanLBFGS.buffer[i], NULL);
 			}
+			free(vulkanLBFGS.buffer);
+			free(vulkanLBFGS.bufferSizes);
+			free(vulkanLBFGS.deviceMemory);
 		}
 		void createApplyDepondt1(VulkanCollection* collection) {
 			{
@@ -6810,7 +6827,7 @@ namespace VulkanCompute
 
 			{
 				
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -6869,7 +6886,7 @@ namespace VulkanCompute
 
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 
@@ -6958,7 +6975,7 @@ namespace VulkanCompute
 
 			{
 				
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -7016,7 +7033,7 @@ namespace VulkanCompute
 
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 
@@ -7073,7 +7090,7 @@ namespace VulkanCompute
 		void recordApplyDepondtAppend(VulkanCollection* collection, VkCommandBuffer* commandBuffer) {
 
 			vkCmdPushConstants(commandBuffer[0], collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 2 * sizeof(scalar), &vulkanLBFGS.applyDepondtConsts);
-			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 			vkCmdBindDescriptorSets(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 			vkCmdDispatch(commandBuffer[0], (uint32_t)ceil(SIZES[0] * SIZES[1] * SIZES[2] / 1024.0f), 1, 1);
 
@@ -7184,6 +7201,9 @@ namespace VulkanCompute
 				vkFreeMemory(device, vulkanLBFGS.deviceMemory[i], NULL);
 				vkDestroyBuffer(device, vulkanLBFGS.buffer[i], NULL);
 			}
+			free(vulkanLBFGS.buffer);
+			free(vulkanLBFGS.bufferSizes);
+			free(vulkanLBFGS.deviceMemory);
 		}
 		void createApplyRK4_1(VulkanCollection* collection) {
 			{
@@ -7265,7 +7285,7 @@ namespace VulkanCompute
 
 			{
 				
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -7324,7 +7344,7 @@ namespace VulkanCompute
 
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 
@@ -7408,7 +7428,7 @@ namespace VulkanCompute
 
 			{
 				
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -7464,7 +7484,7 @@ namespace VulkanCompute
 				computePipelineCreateInfo.stage = pipelineShaderStageCreateInfo;
 				computePipelineCreateInfo.layout = collection[0].pipelineLayout;
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 
@@ -7548,7 +7568,7 @@ namespace VulkanCompute
 
 			{
 				
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -7606,7 +7626,7 @@ namespace VulkanCompute
 
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 
@@ -7700,7 +7720,7 @@ namespace VulkanCompute
 
 			{
 				
-				collection[0].pipelines = (VkPipeline*)malloc(sizeof(VkPipeline));
+				
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -7758,7 +7778,7 @@ namespace VulkanCompute
 
 
 
-				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, collection[0].pipelines);
+				vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, NULL, &collection[0].pipelines);
 				vkDestroyShaderModule(device, pipelineShaderStageCreateInfo.module, NULL);
 			}
 
@@ -7836,7 +7856,7 @@ namespace VulkanCompute
 		void recordApplyRK4Append(VulkanCollection* collection, VkCommandBuffer* commandBuffer) {
 
 			vkCmdPushConstants(commandBuffer[0], collection[0].pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 2 * sizeof(scalar), &vulkanLBFGS.applyRK4Consts);
-			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines[0]);
+			vkCmdBindPipeline(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelines);
 			vkCmdBindDescriptorSets(commandBuffer[0], VK_PIPELINE_BIND_POINT_COMPUTE, collection[0].pipelineLayout, 0, 1, &collection[0].descriptorSets[0], 0, NULL);
 			vkCmdDispatch(commandBuffer[0], (uint32_t)ceil(SIZES[0] * SIZES[1] * SIZES[2] / 1024.0f), 1, 1);
 
@@ -7881,11 +7901,13 @@ namespace VulkanCompute
 			//vkFreeDescriptorSets(device, collection->descriptorPool, collection->descriptorNum, collection->descriptorSets);
 			//if (collection->commandBuffer != NULL)
 				//vkFreeCommandBuffers(device, commandPool, 1, &collection->commandBuffer);
-
+			
 			vkDestroyDescriptorPool(device, collection->descriptorPool, NULL);
 			vkDestroyDescriptorSetLayout(device, collection->descriptorSetLayouts[0],NULL);
 			vkDestroyPipelineLayout(device, collection->pipelineLayout, NULL);
-			vkDestroyPipeline(device, collection->pipelines[0], NULL);
+			vkDestroyPipeline(device, collection->pipelines, NULL);
+			free(collection->descriptorSetLayouts);
+			free(collection->descriptorSets);
 			collection = NULL;
 			
 		}
