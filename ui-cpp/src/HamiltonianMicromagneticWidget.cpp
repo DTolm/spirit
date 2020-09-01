@@ -274,13 +274,14 @@ void HamiltonianMicromagneticWidget::set_external_field()
         float d, vd[3];
 
         // External magnetic field
-        //		magnitude
+
+        //		normal
+
         if (this->checkBox_extH_aniso->isChecked()) d = this->lineEdit_extH_aniso->text().toFloat();
         else {
-            this->checkBox_extH_aniso->setText(QString::number(0));
+            this->lineEdit_extH_aniso->setText(QString::number(0));
             d = 0.0;
         }
-        //		normal
         vd[0] = lineEdit_extHx_aniso->text().toFloat();
         vd[1] = lineEdit_extHy_aniso->text().toFloat();
         vd[2] = lineEdit_extHz_aniso->text().toFloat();

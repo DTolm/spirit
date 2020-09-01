@@ -55,6 +55,7 @@ namespace VulkanCompute
 		scalar max_move=200;
 		scalar kernel_accuracy=6.0;
 		int GPU_ID=0;
+		int num_nonzero_Ms = 1;
 	} VulkanSpiritLaunchConfiguration;
 
 	typedef struct {
@@ -670,7 +671,7 @@ namespace VulkanCompute
 			forward_configuration.isInputFormatted = false;
 			forward_configuration.isOutputFormatted = false;
 			forward_configuration.device = &device;
-
+			forward_configuration.coalescedMemory = 32;
 			sprintf(forward_configuration.shaderPath, SHADER_DIR);
 
 			bufferSizeKernel = forward_configuration.coordinateFeatures * 2 * sizeof(scalar) * (forward_configuration.size[0] / 2 + 1) * (forward_configuration.size[1]) * (forward_configuration.size[2]);
@@ -755,9 +756,12 @@ namespace VulkanCompute
 			free( data_regions_book);
 		}
 		void updateRegions(int* regions) {
+			launchConfiguration.num_nonzero_Ms = SIZES[0] * SIZES[1] * SIZES[2];
 			int* data_regions = (int*)malloc(sizeof(int) * SIZES[0] * SIZES[1] * SIZES[2]);
 			for (uint32_t i = 0; i < SIZES[0] * SIZES[1] * SIZES[2]; ++i) {
 				data_regions[i] = regions[i];
+				if (regions_book_local[regions[i]].Ms == 0)
+					launchConfiguration.num_nonzero_Ms--;
 			}
 			transferDataFromCPU(data_regions, bufferSizeRegions, &bufferRegions);
 			free( data_regions);
@@ -1072,7 +1076,7 @@ namespace VulkanCompute
 
 			MaxForce[0] = temp[0];
 			for (int i = 1; i < 6; i++) {
-				energy[i-1] = temp[i] * 0.5f * regions_book_local[0].Ms;
+				energy[i-1] = temp[i] * 0.5f;
 			}
 			meanMag[0][0] = temp[6];
 			meanMag[0][1] = temp[7];

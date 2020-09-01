@@ -25,7 +25,7 @@ try
     // Fetch correct indices and pointers
     from_indices( state, idx_image, idx_chain, image, chain );
 
-    return image->nos;
+    return image->app.launchConfiguration.num_nonzero_Ms;
 }
 catch( ... )
 {

@@ -149,28 +149,29 @@ void Method_Solver<Solver::LBFGS_OSO>::Iteration()
         this->systems[0]->app.getEnergy(energy, &meanMag, &max_Force, &maxmove);
         energy[0] *= 2;
         for (int i = 0; i < 5; i++) {
-            energy_full += energy[i] ;
             this->systems[0]->hamiltonian->energy_array[i].second = energy[i];
+            energy[i] /= this->systems[0]->app.launchConfiguration.num_nonzero_Ms;
+            energy_full += energy[i];
         }
         //this->systems[0]->hamiltonian->energy_contributions_per_spin[0].second[0] = energy_full;
-        this->systems[0]->M = meanMag/ (this->systems[0]->geometry->nos);
+        this->systems[0]->M = meanMag/ this->systems[0]->app.launchConfiguration.num_nonzero_Ms;
         //scalar max_Force =this->systems[0]->app.getMaxForce();
         //if (this->force_max_abs_component == sqrt(max_Force))  this->systems[0]->iteration_allowed = false;
 
         this->force_max_abs_component = sqrt(max_Force);
         if  (this->force_max_abs_component < this->systems[0]->app.launchConfiguration.maxTorque) this->systems[0]->iteration_allowed = false;
-        //std::cout << "maxTorque: " << this->force_max_abs_component<<" Mx: " << this->systems[0]->M[0] << " My: " << this->systems[0]->M[1] << " Mz: " << this->systems[0]->M[2] << " m_sum: " << this->systems[0]->M[0]+ this->systems[0]->M[1]+this->systems[0]->M[2] <<" Efull: " << energy_full / this->systems[0]->geometry->nos << " Ezeeman: " << energy[0] / this->systems[0]->geometry->nos << " Eanis: " << energy[1] / this->systems[0]->geometry->nos << " Eexch: " << energy[2] / this->systems[0]->geometry->nos << " Edmi: " << energy[3] / this->systems[0]->geometry->nos << " Eddi: " << energy[4] / this->systems[0]->geometry->nos << "\n";
+        //std::cout << "maxTorque: " << this->force_max_abs_component<<" Mx: " << this->systems[0]->M[0] << " My: " << this->systems[0]->M[1] << " Mz: " << this->systems[0]->M[2] << " m_sum: " << this->systems[0]->M[0]+ this->systems[0]->M[1]+this->systems[0]->M[2] <<" Efull: " << energy_full / num_nonzero_Ms << " Ezeeman: " << energy[0] / num_nonzero_Ms << " Eanis: " << energy[1] / num_nonzero_Ms << " Eexch: " << energy[2] / num_nonzero_Ms << " Edmi: " << energy[3] / num_nonzero_Ms << " Eddi: " << energy[4] / num_nonzero_Ms << "\n";
         /*if (iterations == 0) {
             std::ofstream outfile;
          
             outfile.open("output/2506/energy.txt", std::ios_base::app);
-            outfile << "init field: "<< " maxTorque: " << this->force_max_abs_component << " Mx: " << this->systems[0]->M[0] << " My: " << this->systems[0]->M[1] << " Mz: " << this->systems[0]->M[2] << " m_sum: " << this->systems[0]->M[0] + this->systems[0]->M[1] + this->systems[0]->M[2] << " Efull: " << energy_full / this->systems[0]->geometry->nos << " Ezeeman: " << energy[0] / this->systems[0]->geometry->nos << " Eanis: " << energy[1] / this->systems[0]->geometry->nos << " Eexch: " << energy[2] / this->systems[0]->geometry->nos << " Edmi: " << energy[3] / this->systems[0]->geometry->nos << " Eddi: " << energy[4] / this->systems[0]->geometry->nos << "\n";
+            outfile << "init field: "<< " maxTorque: " << this->force_max_abs_component << " Mx: " << this->systems[0]->M[0] << " My: " << this->systems[0]->M[1] << " Mz: " << this->systems[0]->M[2] << " m_sum: " << this->systems[0]->M[0] + this->systems[0]->M[1] + this->systems[0]->M[2] << " Efull: " << energy_full / num_nonzero_Ms << " Ezeeman: " << energy[0] / num_nonzero_Ms << " Eanis: " << energy[1] / num_nonzero_Ms << " Eexch: " << energy[2] / num_nonzero_Ms << " Edmi: " << energy[3] / num_nonzero_Ms << " Eddi: " << energy[4] / num_nonzero_Ms << "\n";
            
         }
         */
-        std::cout << "iteration: " << iterations << " maxTorque: " << this->force_max_abs_component << " Mx: " << this->systems[0]->M[0] << " My: " << this->systems[0]->M[1] << " Mz: " << this->systems[0]->M[2] << " Efull: " << energy_full / this->systems[0]->geometry->nos << " Ezeeman: " << energy[0] / this->systems[0]->geometry->nos << " Eanis: " << energy[1] / this->systems[0]->geometry->nos << " Eexch: " << energy[2] / this->systems[0]->geometry->nos << " Edmi: " << energy[3] / this->systems[0]->geometry->nos << " Eddi: " << energy[4] / this->systems[0]->geometry->nos << "\n";
+        std::cout << "iteration: " << iterations << " maxTorque: " << this->force_max_abs_component << " Mx: " << this->systems[0]->M[0] << " My: " << this->systems[0]->M[1] << " Mz: " << this->systems[0]->M[2] << " Efull: " << energy_full << " Ezeeman: " << energy[0] << " Eanis: " << energy[1] << " Eexch: " << energy[2] << " Edmi: " << energy[3] << " Eddi: " << energy[4] << "\n";
 
-        //std::cout <<"Efull: "<< energy_full / this->systems[0]->geometry->nos << " Ezeeman: " << energy[0] / this->systems[0]->geometry->nos << " Eanis: " << energy[1] / this->systems[0]->geometry->nos << " Eexch: " << energy[2] / this->systems[0]->geometry->nos << " Edmi: " << energy[3] / this->systems[0]->geometry->nos << " Eddi: " << energy[4] / this->systems[0]->geometry->nos << "\n";
+        //std::cout <<"Efull: "<< energy_full / num_nonzero_Ms << " Ezeeman: " << energy[0] / num_nonzero_Ms << " Eanis: " << energy[1] / num_nonzero_Ms << " Eexch: " << energy[2] / num_nonzero_Ms << " Edmi: " << energy[3] / num_nonzero_Ms << " Eddi: " << energy[4] / num_nonzero_Ms << "\n";
         //std::cout <<"maxForce: " << sqrt(max_Force) << " maxmove: " << maxmove << " Mx: " << this->systems[0]->M[0] << " My: " << this->systems[0]->M[1] << " Mz: " << this->systems[0]->M[2] << "\n";
 
         //this->systems[0]->app.writeGradient((*this->configurations[0]).data());
