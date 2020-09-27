@@ -17,6 +17,7 @@ Currently working:\
 -regions with different parameters, periodic/open boundary conditions, freezing spins\
 -passing standard problems #1-#4\
 -Qt GUI - almost every parameter can be adjusted from there\
+-Max system sizes supported: (2^14, 2^15, 2^15)\
 \
 Not working yet (compared to current Spirit release version):\
   -Methods, other than LLG\
